@@ -145,6 +145,16 @@ textarea.inp{width:100%;min-height:150px;font-family:var(--f-mono);font-size:13p
 .pista button.on{background:var(--blue);color:var(--blue-ink)}
 .pista button.on small,.pista button.on .pp{color:inherit}
 .pista button.srv{box-shadow:inset 0 0 0 2px var(--ball)}
+.pista button.lib{background:color-mix(in srgb,var(--ball) 30%,var(--court))}
+.pista button.lib.on{background:var(--blue)}
+.rotbox .rr{color:var(--ink)}
+.rotprev{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.rotprev .r{font-family:var(--f-disp);font-size:22px;font-weight:700;color:var(--blue);min-width:44px}
+.checks{display:flex;flex-wrap:wrap;gap:6px}
+.checks label{display:flex;gap:5px;align-items:center;border:1px solid var(--line);border-radius:6px;padding:4px 8px;font-size:13px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.seg button{border:0;background:var(--surface);padding:6px 10px;font-weight:600}
+.seg button.on{background:var(--blue);color:var(--blue-ink)}
 .pista .empty{grid-column:1/-1;padding:16px;text-align:center;color:var(--muted);background:var(--court);border-radius:5px}
 .agrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
 .flabel{display:grid;gap:3px;font-size:12px;color:var(--muted);font-weight:600;min-width:0}
@@ -183,6 +193,14 @@ textarea.inp{width:100%;min-height:150px;font-family:var(--f-mono);font-size:13p
         <button class="mini" id="servTog" title="Canvia qui serveix">Saque</button>
       </div>
     </div>
+    <div class="rotbox">
+      <span class="label">Rival</span>
+      <span class="r rr num" id="sRR">–</span>
+      <div class="mini-btns">
+        <button class="mini" id="rrPrev" title="Rotació rival anterior">−</button>
+        <button class="mini" id="rrNext" title="Rotació rival següent">+</button>
+      </div>
+    </div>
   </header>
 
   <div class="main">
@@ -216,9 +234,11 @@ textarea.inp{width:100%;min-height:150px;font-family:var(--f-mono);font-size:13p
       <div class="row">
         <button class="btn" id="btnAlin">Alineació</button>
         <button class="btn" id="btnCanvi">Canvi</button>
+        <button class="btn" id="btnLib">Lliure</button>
       </div>
       <div class="sub" id="alinBox" hidden></div>
       <div class="sub" id="canviBox" hidden></div>
+      <div class="sub" id="libBox" hidden></div>
 
       <h2>Acció</h2>
       <div class="codebar">
@@ -265,7 +285,7 @@ const FON={S:'Servei',R:'Recepció',E:'Col·locació',A:'Atac',B:'Bloqueig',D:'D
 const VALS=['#','+','!','-','='];
 const VDESC={'#':'Perfecte','+':'Positiu','!':'Regular','-':'Negatiu','=':'Error'};
 const ZLAY=[4,3,2,5,6,1];
-const KEY='vidia-volei-v2';
+const KEY='vidia-volei-v3';
 
 /* ---------- Dades d'exemple ---------- */
 function rng(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
@@ -274,8 +294,9 @@ function sample(){
   const pick=a=>a[Math.floor(r()*a.length)];
   const wpick=d=>{let x=r(),s=0;for(const k in d){s+=d[k];if(x<s)return k}return Object.keys(d).pop()};
   const jug=[[1,'Pol Serra','Col'],[4,'Arnau Vidal','Rec'],[7,'Marc Puig','Rec'],[9,'Jan Roca','Cen'],[11,'Biel Font','Cen'],[13,'Oriol Mas','Opo'],[2,'Nil Soler','Lli'],[5,'Pau Ribes','Rec'],[8,'Guillem Camps','Cen'],[10,'Èric Bosch','Opo'],[12,'Martí Coll','Col'],[3,'Joan Prat','Lli']].map(([num,nom,pos])=>({num,nom,pos}));
-  const alin={1:{pos:[1,4,9,13,7,11],lib:2,serv:'nos'},2:{pos:[1,4,9,13,7,11],lib:2,serv:'ells'},3:{pos:[13,7,11,1,4,9],lib:2,serv:'nos'},4:{pos:[1,4,9,13,7,11],lib:3,serv:'ells'},5:{pos:[1,4,9,13,7,11],lib:2,serv:'nos'}};
-  const ev=[];let id=1,t=95,set=1,a=0,b=0,wa=0,wb=0,subDone=false;
+  const L={lib:2,lib2:3,libPer:[9,11],libMode:'auto'};
+  const alin={1:{pos:[1,4,9,13,7,11],...L,serv:'nos',rivRot:1},2:{pos:[1,4,9,13,7,11],...L,serv:'ells',rivRot:4},3:{pos:[13,7,11,1,4,9],...L,serv:'nos',rivRot:1},4:{pos:[1,4,9,13,7,11],...L,serv:'ells',rivRot:3},5:{pos:[1,4,9,13,7,11],...L,serv:'nos',rivRot:1}};
+  const ev=[];let id=1,t=95,set=1,a=0,b=0,wa=0,wb=0,subDone=false,libSw=false;
   let court=alin[1].pos.slice(),serv=alin[1].serv,lib=alin[1].lib;
   const SETTERS=[1,12];
   const setter=()=>court.find(n=>SETTERS.includes(n))||1;
@@ -296,6 +317,7 @@ function sample(){
     if(v==='#')return pt('nos',e.id);if(v==='=')return pt('ells',e.id);return pt(r()<.5?'nos':'ells')};
   let guard=0;
   while(wa<3&&wb<3&&guard++<400){
+    if(set===3&&!libSw&&a+b>=20){ev.push({id:id++,tipus:'libcur',t:Math.round(t),lib:3});lib=3;libSw=true}
     if(set===2&&!subDone&&a+b>=24&&court.includes(13)){ev.push({id:id++,tipus:'canvi',t:Math.round(t),surt:13,entra:10});court[court.indexOf(13)]=10;subDone=true;t+=20}
     if(serv==='nos'){
       const v=wpick({'#':.07,'+':.2,'!':.3,'-':.3,'=':.13});const e=acc(court[0],'S',v,1,pick([1,5,6,1,5]));
@@ -322,7 +344,7 @@ let S;
 try{const raw=localStorage.getItem(KEY);S=raw?JSON.parse(raw):null}catch(e){S=null}
 if(!S||!S.ev)S=sample();
 if(!S.alin)S.alin={};
-let ui={alin:false,canvi:false};
+let ui={alin:false,canvi:false,lib:false,dismissed:{}};
 let sel={jug:null,fon:null,zi:null,zf:null};
 let tab='reg',fSet='tots',heatF='A',heatJ='tots',heatMode='zf';
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
@@ -337,22 +359,50 @@ function autoPunt(f,v){
 function isSetter(n){const j=S.jug.find(x=>x.num===n);return !!(j&&/^col/i.test(j.pos||''))}
 function setterPos(court){if(!court)return null;for(let i=0;i<6;i++)if(isSetter(court[i]))return i+1;return null}
 function validAlin(a){return a&&Array.isArray(a.pos)&&a.pos.length===6&&a.pos.every(n=>n)&&new Set(a.pos).size===6}
+const BACK=[0,4,5],FRONT=[1,2,3];
+function defaultLibPer(pos){return pos.filter(n=>{const j=S.jug.find(x=>x.num===n);return j&&/^cen/i.test(j.pos||'')})}
+/* Pista visible: la base de rotació amb el lliure posat on toca */
+function display(st){
+  if(!st.court)return null;
+  const d=st.court.slice();st.libAt=-1;
+  const L=st.libCur;if(!L)return d;
+  if(st.libMode==='manual'){
+    if(st.libOn){const i=st.court.indexOf(st.libOn);if(i>=0&&BACK.includes(i)){d[i]=L;st.libAt=i}}
+  }else{
+    for(const i of BACK){
+      if(i===0&&st.serv==='nos')continue;          // el central serveix
+      if(st.libPer.includes(st.court[i])){d[i]=L;st.libAt=i;break}
+    }
+  }
+  return d;
+}
 function replay(){
   const A=S.alin||{};
-  const st={set:1,nos:0,ells:0,rotc:S.cfg.rot0,serv:S.cfg.serv0,wn:0,we:0,sets:[],court:null,lib:null,subs:0};
-  const startSet=()=>{const a=A[st.set];st.subs=0;
-    if(validAlin(a)){st.court=a.pos.slice();st.lib=a.lib||null;if(a.serv)st.serv=a.serv;st.rotc=1}};
+  const st={set:1,nos:0,ells:0,rotc:S.cfg.rot0,serv:S.cfg.serv0,wn:0,we:0,sets:[],court:null,lib:null,lib2:null,libCur:null,libPer:[],libMode:'auto',libOn:null,rr:null,subs:0};
+  const startSet=()=>{const a=A[st.set];st.subs=0;st.libOn=null;
+    if(validAlin(a)){st.court=a.pos.slice();st.lib=a.lib||null;st.lib2=a.lib2||null;st.libCur=st.lib||st.lib2;
+      st.libPer=Array.isArray(a.libPer)?a.libPer.slice():defaultLibPer(a.pos);st.libMode=a.libMode||'auto';
+      if(a.serv)st.serv=a.serv;st.rotc=1;st.rr=a.rivRot||null}};
   const R=()=>setterPos(st.court)||st.rotc;
-  const shift=d=>{if(st.court)st.court=d>0?st.court.slice(1).concat(st.court[0]):[st.court[5]].concat(st.court.slice(0,5));st.rotc=d>0?nextRot(st.rotc):prevRot(st.rotc)};
+  // si el jugador que cobreix el lliure arriba a primera línia, el lliure surt (mode manual)
+  const enforce=()=>{if(st.libOn&&st.court){const i=st.court.indexOf(st.libOn);if(i<0||FRONT.includes(i))st.libOn=null}};
+  const shift=d=>{if(st.court)st.court=d>0?st.court.slice(1).concat(st.court[0]):[st.court[5]].concat(st.court.slice(0,5));st.rotc=d>0?nextRot(st.rotc):prevRot(st.rotc);enforce()};
   startSet();
   const der=S.ev.map(e=>{
-    const c={set:st.set,nos:st.nos,ells:st.ells,rot:R(),serv:st.serv,court:st.court?st.court.slice():null};
+    const disp=display(st);
+    const c={set:st.set,nos:st.nos,ells:st.ells,rot:R(),rr:st.rr,serv:st.serv,court:disp,base:st.court?st.court.slice():null,lib:st.libAt>=0?st.libCur:null};
     if(e.tipus==='rot'){if(e.d)shift(e.d);else if(e.rot)st.rotc=e.rot}
+    else if(e.tipus==='rrot'){if(st.rr)st.rr=e.d>0?nextRot(st.rr):prevRot(st.rr);else st.rr=1}
     else if(e.tipus==='serv')st.serv=e.serv;
-    else if(e.tipus==='canvi'){if(st.court){const i=st.court.indexOf(e.surt);if(i>=0)st.court[i]=e.entra}st.subs++}
+    else if(e.tipus==='canvi'){if(st.court){const i=st.court.indexOf(e.surt);if(i>=0){st.court[i]=e.entra;
+        const k=st.libPer.indexOf(e.surt);if(k>=0)st.libPer[k]=e.entra;if(st.libOn===e.surt)st.libOn=e.entra}}st.subs++}
+    else if(e.tipus==='libin'){if(e.lib)st.libCur=e.lib;st.libOn=e.per;enforce()}
+    else if(e.tipus==='libout'){st.libOn=null}
+    else if(e.tipus==='libcur'){st.libCur=e.lib}
+    else if(e.tipus==='libmode'){st.libMode=e.mode;st.libOn=null}
     else if(e.tipus==='punt'){
       if(e.guanya==='nos'){st.nos++;if(st.serv==='ells'){shift(1);st.serv='nos'}}
-      else{st.ells++;st.serv='ells'}
+      else{st.ells++;if(st.serv==='nos'&&st.rr)st.rr=nextRot(st.rr);st.serv='ells'}
       const lim=st.set===5?15:25;
       if(Math.max(st.nos,st.ells)>=lim&&Math.abs(st.nos-st.ells)>=2){
         st.sets.push({set:st.set,nos:st.nos,ells:st.ells});
@@ -362,7 +412,7 @@ function replay(){
     }
     return Object.assign({},e,{c});
   });
-  st.rot=R();
+  st.rot=R();st.disp=display(st);
   return {der,st};
 }
 
@@ -451,68 +501,137 @@ function renderPicker(){
 }
 
 /* ---------- Pista, alineacions i canvis ---------- */
-function autoServer(){const {st}=replay();return st.court&&st.serv==='nos'?st.court[0]:null}
+function autoServer(){const {st}=replay();return st.disp&&st.serv==='nos'?st.disp[0]:null}
 function first(n){const j=S.jug.find(x=>x.num===n);return j?j.nom.split(' ')[0]:''}
+function rotOf(pos){return setterPos(pos)}
 function renderPista(){
   const {st}=replay();
   const has=validAlin(S.alin[st.set]);
   const w=$('#alinWarn');
-  if(!has&&st.court){w.hidden=false;w.textContent=`El set ${st.set} no té alineació pròpia: es manté la pista del set anterior. Revisa-la amb Alineació.`}
-  else if(!st.court&&S.jug.length){w.hidden=false;w.textContent=`Defineix l'alineació inicial del set ${st.set} per seguir rotacions, servidors i canvis.`}
+  if(!has&&st.court){w.hidden=false;w.innerHTML=`El set ${st.set} no té alineació pròpia: es manté la pista del set anterior. <button class="mini" id="warnAlin">Defineix-la</button>`}
+  else if(!st.court&&S.jug.length){w.hidden=false;w.innerHTML=`Defineix l'alineació inicial del set ${st.set} per seguir rotacions, servidors, canvis i lliure. <button class="mini" id="warnAlin">Alineació</button>`}
   else w.hidden=true;
-  if(!st.court){$('#pista').innerHTML=`<div class="empty">Sense alineació. La rotació es compta igualment, però sense saber qui és a pista.</div>`}
+  const wb=$('#warnAlin');if(wb)wb.onclick=()=>openAlin();
+  if(!st.disp){$('#pista').innerHTML=`<div class="empty">Sense alineació. La rotació es compta igualment, però sense saber qui és a pista.</div>`}
   else{
-    $('#pista').innerHTML=[3,2,1,4,5,0].map(i=>{const n=st.court[i];
-      return `<button class="${sel.jug===n?'on':''} ${i===0&&st.serv==='nos'?'srv':''}" data-j="${n}" title="${esc(jname(n))}"><span class="pp">P${i+1}${i===0&&st.serv==='nos'?' · SERVEIX':''}</span><b class="num">${n}</b><small>${esc(first(n))}</small></button>`}).join('');
+    $('#pista').innerHTML=[3,2,1,4,5,0].map(i=>{const n=st.disp[i],isL=i===st.libAt,srv=i===0&&st.serv==='nos';
+      return `<button class="${sel.jug===n?'on':''} ${srv?'srv':''} ${isL?'lib':''}" data-j="${n}" title="${esc(jname(n))}"><span class="pp">P${i+1}${srv?' · SERVEIX':''}${isL?' · L':''}</span><b class="num">${n}</b><small>${isL?'per '+st.court[i]:esc(first(n))}</small></button>`}).join('');
   }
   $('#subsInfo').textContent=st.court?`Set ${st.set} · ${st.subs}/6 canvis`:'';
-  $('#libInfo').textContent=st.court&&st.lib?`Lliure: ${st.lib} · ${jname(st.lib)}`:'';
+  const libs=[st.lib,st.lib2].filter(Boolean);
+  $('#libInfo').textContent=st.court&&libs.length?`Lliure${libs.length>1?'s':''}: ${libs.map(n=>n+' '+first(n)+(n===st.libCur&&libs.length>1?' (actiu)':'')).join(' · ')} · mode ${st.libMode==='manual'?'manual':'automàtic'}${st.libMode==='auto'&&st.libPer.length?' per '+st.libPer.join(', '):''}`:'';
+  // Assistent d'inici de set: s'obre sol quan comença un set sense alineació
+  if(S.jug.length&&!has&&st.nos+st.ells===0&&st.wn<3&&st.we<3&&!ui.alin&&!ui.dismissed[st.set]){openAlin(st.set,true)}
 }
 function optList(list,selv){return '<option value="">—</option>'+list.map(j=>`<option value="${j.num}" ${selv===j.num?'selected':''}>${j.num} · ${esc(j.nom)}${j.pos?' ('+esc(j.pos)+')':''}</option>`).join('')}
-function openAlin(n){
+function openAlin(n,auto){
   const {st}=replay();n=n||st.set;
-  const box=$('#alinBox');ui.alin=true;box.hidden=false;$('#canviBox').hidden=true;ui.canvi=false;
+  const box=$('#alinBox');ui.alin=true;ui.alinSet=n;box.hidden=false;$('#canviBox').hidden=true;$('#libBox').hidden=true;ui.canvi=ui.lib=false;
   if(!S.jug.length){box.innerHTML=`<span>Afegeix primer la plantilla a la pestanya <b>Partit</b>.</span><div class="row"><button class="btn" id="aCancel">Tanca</button></div>`;$('#aCancel').onclick=closeBoxes;return}
   const a=S.alin[n]||{};
-  const pre=validAlin(a)?a.pos:(n===st.set&&st.court?st.court:(S.alin[n-1]&&validAlin(S.alin[n-1])?S.alin[n-1].pos:[]));
+  const prev=S.alin[n-1]&&validAlin(S.alin[n-1])?S.alin[n-1]:null;
+  const pre=validAlin(a)?a.pos:(n===st.set&&st.court?st.court:(prev?prev.pos:[]));
+  const ref=validAlin(a)?a:(prev||{});
   const roster=[...S.jug].sort((x,y)=>x.num-y.num);
-  box.innerHTML=`<div class="row" style="justify-content:space-between"><b>Alineació inicial</b>
+  const lib1=a.lib||ref.lib||null,lib2=a.lib2||ref.lib2||null;
+  const per=Array.isArray(a.libPer)?a.libPer:(Array.isArray(ref.libPer)?ref.libPer:defaultLibPer(pre));
+  const mode=a.libMode||ref.libMode||'auto';
+  const servDefault=a.serv||(prev?(prev.serv==='nos'?'ells':'nos'):'nos');
+  box.innerHTML=`<div class="row" style="justify-content:space-between"><b>${auto?`Inici del set ${n}`:'Alineació inicial'}</b>
     <select class="inp" id="aSetN" aria-label="Set">${[1,2,3,4,5].map(k=>`<option value="${k}" ${k===n?'selected':''}>Set ${k}</option>`).join('')}</select></div>
-    <div class="note">Xarxa a dalt. P1 és qui serveix quan el saque és nostre.</div>
+    ${auto?`<div class="note">Indica com comencen els dos equips. Pots partir de l'alineació del set anterior i girar-la fins a la rotació inicial.</div>`:''}
+    <div class="row">${prev?`<button class="btn" id="aCopy">Copia el set ${n-1}</button>`:''}
+      <div class="rotprev"><button class="btn" id="aRotB" title="Gira cap enrere">↺</button><span class="r num" id="aRot">–</span><button class="btn" id="aRotF" title="Gira cap endavant">↻</button></div></div>
+    <div class="note">Xarxa a dalt. P1 serveix quan el saque és nostre. Les fletxes giren les sis posicions sense canviar-ne l'ordre.</div>
     <div class="agrid">${[3,2,1,4,5,0].map(i=>`<label class="flabel">P${i+1}<select class="inp" id="aP${i}">${optList(roster,pre[i])}</select></label>`).join('')}</div>
     <div class="agrid">
-      <label class="flabel">Lliure<select class="inp" id="aL">${optList(roster,a.lib||(S.alin[n-1]||{}).lib)}</select></label>
-      <label class="flabel">Serveix primer<select class="inp" id="aS"><option value="nos" ${a.serv!=='ells'?'selected':''}>${esc(S.meta.equip)}</option><option value="ells" ${a.serv==='ells'?'selected':''}>${esc(S.meta.rival)}</option></select></label>
+      <label class="flabel">Serveix primer<select class="inp" id="aS"><option value="nos" ${servDefault==='nos'?'selected':''}>${esc(S.meta.equip)}</option><option value="ells" ${servDefault==='ells'?'selected':''}>${esc(S.meta.rival)}</option></select></label>
+      <label class="flabel">Rotació inicial del rival<select class="inp" id="aRR"><option value="">No la segueixo</option>${[1,2,3,4,5,6].map(r=>`<option value="${r}" ${a.rivRot===r?'selected':''}>R${r}</option>`).join('')}</select></label>
     </div>
-    <div class="row"><button class="btn pri" id="aSave">Desa l'alineació</button><button class="btn" id="aCancel">Tanca</button></div>`;
+    <b style="margin-top:4px">Lliure</b>
+    <div class="agrid">
+      <label class="flabel">Lliure 1<select class="inp" id="aL">${optList(roster,lib1)}</select></label>
+      <label class="flabel">Lliure 2<select class="inp" id="aL2">${optList(roster,lib2)}</select></label>
+      <div class="flabel">Control<div class="seg" id="aMode"><button type="button" data-m="auto" class="${mode==='auto'?'on':''}">Auto</button><button type="button" data-m="manual" class="${mode==='manual'?'on':''}">Manual</button></div></div>
+    </div>
+    <div class="flabel" id="aPerWrap">Entra automàticament per<div class="checks" id="aPer"></div></div>
+    <div class="note" id="aModeNote"></div>
+    <div class="row"><button class="btn pri" id="aSave">Desa i comença</button><button class="btn" id="aCancel">${auto?'Ara no':'Tanca'}</button></div>`;
+  let curMode=mode;
+  const readPos=()=>[0,1,2,3,4,5].map(i=>+$('#aP'+i).value||0);
+  const setPos=pos=>pos.forEach((v,i)=>$('#aP'+i).value=v||'');
+  const renderPer=()=>{const pos=readPos().filter(Boolean);const cur=[...document.querySelectorAll('#aPer input:checked')].map(x=>+x.value);
+    const chosen=cur.length||$('#aPer').dataset.init?cur:per;$('#aPer').dataset.init='1';
+    $('#aPer').innerHTML=pos.map(n=>`<label><input type="checkbox" value="${n}" ${chosen.includes(n)?'checked':''}> ${n} ${esc(first(n))}</label>`).join('')||'<span class="note">Omple primer les posicions.</span>'};
+  const upd=()=>{const pos=readPos();const r=pos.every(Boolean)?rotOf(pos):null;$('#aRot').textContent=r?'R'+r:'–';
+    $('#aPerWrap').hidden=curMode!=='auto';
+    $('#aModeNote').textContent=curMode==='auto'?"El lliure entra sol a la zona de defensa pels jugadors marcats (normalment els centrals) i surt quan arriben a la xarxa o els toca servir.":"El lliure només entra i surt quan ho indiques amb el botó Lliure. Surt sol si el jugador que cobreix arriba a la xarxa."};
+  renderPer();upd();
+  for(let i=0;i<6;i++)$('#aP'+i).onchange=()=>{renderPer();upd()};
+  $('#aRotF').onclick=()=>{const p=readPos();setPos(p.slice(1).concat(p[0]));upd()};
+  $('#aRotB').onclick=()=>{const p=readPos();setPos([p[5]].concat(p.slice(0,5)));upd()};
+  if(prev)$('#aCopy').onclick=()=>{setPos(prev.pos);$('#aL').value=prev.lib||'';$('#aL2').value=prev.lib2||'';$('#aPer').dataset.init='';$('#aPer').innerHTML='';renderPer();upd()};
+  $('#aMode').onclick=e=>{const b=e.target.closest('button');if(!b)return;curMode=b.dataset.m;[...$('#aMode').children].forEach(x=>x.classList.toggle('on',x===b));upd()};
   $('#aSetN').onchange=e=>openAlin(+e.target.value);
-  $('#aCancel').onclick=closeBoxes;
+  $('#aCancel').onclick=()=>{ui.dismissed[n]=true;closeBoxes()};
   $('#aSave').onclick=()=>{
-    const pos=[0,1,2,3,4,5].map(i=>+$('#aP'+i).value||0);
+    const pos=readPos();
     if(!pos.every(Boolean))return toast('Omple les sis posicions');
     if(new Set(pos).size!==6)return toast('Hi ha un dorsal repetit');
-    const lib=+$('#aL').value||null;if(lib&&pos.includes(lib))return toast('El lliure no pot ser a les sis posicions');
-    S.alin[n]={pos,lib,serv:$('#aS').value};S.meta.exemple=false;save();closeBoxes();render();toast(`Alineació del set ${n} desada`);
+    const lib=+$('#aL').value||null,lib2=+$('#aL2').value||null;
+    if((lib&&pos.includes(lib))||(lib2&&pos.includes(lib2)))return toast('Un lliure no pot ser a les sis posicions');
+    if(lib&&lib===lib2)return toast('Els dos lliures han de ser diferents');
+    const libPer=[...document.querySelectorAll('#aPer input:checked')].map(x=>+x.value);
+    if(curMode==='auto'&&(lib||lib2)&&!libPer.length)return toast('Marca per qui entra el lliure');
+    S.alin[n]={pos,lib:lib||lib2,lib2:lib&&lib2?lib2:null,libPer,libMode:curMode,serv:$('#aS').value,rivRot:+$('#aRR').value||null};
+    S.meta.exemple=false;save();closeBoxes();render();toast(`Set ${n}: comença en R${rotOf(pos)||'?'}`);
   };
 }
 function openCanvi(){
   const {st}=replay();
   if(!st.court)return toast("Defineix primer l'alineació");
-  const box=$('#canviBox');ui.canvi=true;box.hidden=false;$('#alinBox').hidden=true;ui.alin=false;
+  const box=$('#canviBox');ui.canvi=true;box.hidden=false;$('#alinBox').hidden=true;$('#libBox').hidden=true;ui.alin=ui.lib=false;
   const onC=st.court.map(n=>S.jug.find(j=>j.num===n)||{num:n,nom:'Dorsal '+n,pos:''});
-  const bench=S.jug.filter(j=>!st.court.includes(j.num)&&j.num!==st.lib).sort((x,y)=>x.num-y.num);
+  const bench=S.jug.filter(j=>!st.court.includes(j.num)&&j.num!==st.lib&&j.num!==st.lib2).sort((x,y)=>x.num-y.num);
   box.innerHTML=`<b>Canvi · set ${st.set}</b>
     <div class="agrid"><label class="flabel">Surt<select class="inp" id="cvOut">${optList(onC,null)}</select></label>
     <label class="flabel">Entra<select class="inp" id="cvIn">${optList(bench,null)}</select></label></div>
+    <div class="note">Els canvis del lliure no compten aquí: fes servir el botó Lliure.</div>
     <div class="row"><button class="btn pri" id="cvDo">Fes el canvi</button><button class="btn" id="cvCancel">Tanca</button></div>`;
   $('#cvCancel').onclick=closeBoxes;
   $('#cvDo').onclick=()=>{const o=+$('#cvOut').value,i=+$('#cvIn').value;if(!o||!i)return toast('Tria qui surt i qui entra');
     S.ev.push({id:S.nextId++,tipus:'canvi',t:Math.round(curTime()*10)/10,surt:o,entra:i});save();closeBoxes();render();
     toast(st.subs>=6?`Canvi registrat · ja n'hi ha més de 6 en aquest set`:`Entra ${i} per ${o}`)};
 }
-function closeBoxes(){ui.alin=ui.canvi=false;$('#alinBox').hidden=true;$('#canviBox').hidden=true}
+function pushEv(e){S.ev.push(Object.assign({id:S.nextId++,t:Math.round(curTime()*10)/10},e));save()}
+function openLib(){
+  const {st}=replay();
+  if(!st.court)return toast("Defineix primer l'alineació");
+  const libs=[st.lib,st.lib2].filter(Boolean);
+  if(!libs.length)return toast("Indica el lliure a l'alineació del set");
+  const box=$('#libBox');ui.lib=true;box.hidden=false;$('#alinBox').hidden=true;$('#canviBox').hidden=true;ui.alin=ui.canvi=false;
+  const back=BACK.map(i=>st.court[i]);
+  const onNow=st.libAt>=0?st.court[st.libAt]:null;
+  box.innerHTML=`<div class="row" style="justify-content:space-between"><b>Lliure · set ${st.set}</b>
+    <div class="seg" id="lMode"><button type="button" data-m="auto" class="${st.libMode==='auto'?'on':''}">Auto</button><button type="button" data-m="manual" class="${st.libMode==='manual'?'on':''}">Manual</button></div></div>
+    ${libs.length>1?`<div class="flabel">Lliure actiu<div class="seg" id="lCur">${libs.map(n=>`<button type="button" data-l="${n}" class="${n===st.libCur?'on':''}">${n} ${esc(first(n))}</button>`).join('')}</div></div>`:''}
+    ${st.libMode==='manual'?(onNow?`<div>Ara a pista: <b>${st.libCur}</b> per <b>${onNow}</b> ${esc(first(onNow))}.</div><div class="row"><button class="btn pri" id="lOut">Surt el lliure (torna ${onNow})</button></div>`
+      :`<label class="flabel">Entra per<select class="inp" id="lPer">${optList(back.map(n=>S.jug.find(j=>j.num===n)||{num:n,nom:'Dorsal '+n,pos:''}),null)}</select></label><div class="row"><button class="btn pri" id="lIn">Entra el lliure</button></div>`)
+      :`<div class="note">Mode automàtic: entra pels jugadors ${st.libPer.join(', ')||'—'} quan són a la zona de defensa, excepte quan els toca servir. Per canviar-los, edita l'alineació del set.</div>`}
+    <div class="note">Els canvis del lliure no compten com a substitucions.</div>
+    <div class="row"><button class="btn" id="lClose">Tanca</button></div>`;
+  $('#lClose').onclick=closeBoxes;
+  $('#lMode').onclick=e=>{const b=e.target.closest('button');if(!b||b.dataset.m===st.libMode)return;pushEv({tipus:'libmode',mode:b.dataset.m});render();openLib();toast(b.dataset.m==='auto'?'Lliure automàtic':'Lliure manual')};
+  const lc=$('#lCur');if(lc)lc.onclick=e=>{const b=e.target.closest('button');if(!b||+b.dataset.l===st.libCur)return;pushEv({tipus:'libcur',lib:+b.dataset.l});render();openLib();toast('Lliure actiu: '+b.dataset.l)};
+  const li=$('#lIn');if(li)li.onclick=()=>{const p=+$('#lPer').value;if(!p)return toast('Tria per qui entra');pushEv({tipus:'libin',lib:st.libCur,per:p});render();openLib();toast(`Entra ${st.libCur} per ${p}`)};
+  const lo=$('#lOut');if(lo)lo.onclick=()=>{pushEv({tipus:'libout'});render();openLib();toast('Surt el lliure')};
+}
+function closeBoxes(){ui.alin=ui.canvi=ui.lib=false;$('#alinBox').hidden=true;$('#canviBox').hidden=true;$('#libBox').hidden=true}
 $('#btnAlin').onclick=()=>ui.alin?closeBoxes():openAlin();
 $('#btnCanvi').onclick=()=>ui.canvi?closeBoxes():openCanvi();
+$('#btnLib').onclick=()=>ui.lib?closeBoxes():openLib();
+$('#rrNext').onclick=()=>{pushEv({tipus:'rrot',d:1});render()};
+$('#rrPrev').onclick=()=>{pushEv({tipus:'rrot',d:-1});render()};
 document.addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;
   if(b.dataset.j){sel.jug=sel.jug===+b.dataset.j?null:+b.dataset.j;renderPicker()}
@@ -555,13 +674,14 @@ function renderView(){
 $('#fSet').onchange=e=>{fSet=e.target.value;renderView()};
 
 function viewReg(der){
-  const rows=der.filter(e=>e.tipus!=='rot'&&e.tipus!=='serv').slice().reverse().slice(0,300);
+  const rows=der.filter(e=>['acc','punt','canvi','libin','libout'].includes(e.tipus)).slice().reverse().slice(0,300);
   if(!rows.length)return '<p class="muted">Encara no hi ha accions. Tria jugador/a, fonament i valoració, o escriu un codi ràpid com <b>7A#</b>.</p>';
   return `<div class="log">`+rows.map(e=>{
     const tl=mode==='yt'?`<button class="tlink" data-seek="${e.t}" title="Ves a aquest moment">${fmt(e.t)}</button>`
       :S.meta.videoId?`<a class="tlink" href="${ytLink(e.t)}" target="_blank" rel="noopener" title="Obre a YouTube en aquest moment">${fmt(e.t)}</a>`
       :`<span class="tlink" style="text-decoration:none;color:var(--muted)">${fmt(e.t)}</span>`;
     const ctx=`S${e.c.set} · ${e.c.nos}-${e.c.ells} · R${e.c.rot}`;
+    if(e.tipus==='libin'||e.tipus==='libout')return `<div class="li pt">${tl}<span class="code">LLIURE</span><span style="min-width:0">${e.tipus==='libin'?`Entra ${e.lib} per ${e.per} ${esc(first(e.per))}`:'Surt el lliure'}<br><span class="ctx">${ctx}</span></span><button class="del" data-del="${e.id}" aria-label="Esborra">×</button></div>`;
     if(e.tipus==='canvi')return `<div class="li pt">${tl}<span class="code">CANVI</span><span style="min-width:0">Entra ${e.entra} ${esc(first(e.entra))} · surt ${e.surt} ${esc(first(e.surt))}<br><span class="ctx">${ctx}</span></span><button class="del" data-del="${e.id}" aria-label="Esborra">×</button></div>`;
     if(e.tipus==='punt'){const g=e.guanya==='nos';return `<div class="li pt">${tl}<span class="code" style="color:var(--${g?'good':'bad'})">${g?'+1 NOS':'+1 RIV'}</span><span><span class="ctx">${e.auto?'automàtic':'manual'} · ${ctx}</span></span>${e.auto?'<span></span>':`<button class="del" data-del="${e.id}" aria-label="Esborra">×</button>`}</div>`}
     return `<div class="li">${tl}<span class="code">${e.jug}${e.fon}${e.val}${e.zi||''}${e.zf||''}</span><span style="min-width:0">${esc(jname(e.jug))} · ${FON[e.fon]} ${VDESC[e.val].toLowerCase()}<br><span class="ctx">${ctx}</span></span><button class="del" data-del="${e.id}" aria-label="Esborra">×</button></div>`;
@@ -602,11 +722,16 @@ function viewRot(PT,st){
     const so=pct(rec.filter(x=>x.guanya==='nos').length,rec.length),br=pct(sv.filter(x=>x.guanya==='nos').length,sv.length);
     const bal=w-(p.length-w);
     return `<tr><td>R${r}</td><td class="g">${w}</td><td class="b">${p.length-w}</td><td class="${bal>0?'g':bal<0?'b':''}">${bal>0?'+':''}${bal}</td><td>${P(so)}</td><td>${P(br)}</td></tr>`}).join('');
+  const RP=PT.filter(x=>x.c.rr);
+  const rrows=[1,6,5,4,3,2].map(r=>{const p=RP.filter(x=>x.c.rr===r);const w=p.filter(x=>x.guanya==='nos').length;const bal=2*w-p.length;
+    return `<tr><td>R${r}</td><td class="g">${w}</td><td class="b">${p.length-w}</td><td class="${bal>0?'g':bal<0?'b':''}">${bal>0?'+':''}${bal}</td></tr>`}).join('');
   const sets=st.sets.concat(st.nos+st.ells?[{set:st.set,nos:st.nos,ells:st.ells,cur:true}]:[]);
   const setRows=sets.map(s=>`<tr><td>Set ${s.set}${s.cur?' (en joc)':''}</td><td class="${s.nos>s.ells?'g':''}">${s.nos}</td><td class="${s.ells>s.nos?'b':''}">${s.ells}</td></tr>`).join('');
   return `<h3 style="font-size:18px;margin-bottom:6px">Per rotació</h3>
   <div class="tbl-wrap"><table><thead><tr><th>Rotació</th><th>Guanyats</th><th>Perduts</th><th>Balanç</th><th>Side-out</th><th>Break</th></tr></thead><tbody>${rows}</tbody></table></div>
   <p class="note">Side-out = punts guanyats quan serveix el rival. Break = punts guanyats amb el nostre servei. R1 = col·locador/a a zona 1.</p>
+  <h3 style="font-size:18px;margin:10px 0 6px">Per rotació del rival</h3>
+  ${RP.length?`<div class="tbl-wrap"><table><thead><tr><th>Rival</th><th>Guanyats</th><th>Perduts</th><th>Balanç</th></tr></thead><tbody>${rrows}</tbody></table></div><p class="note">Indica en quines rotacions del rival guanyem o perdem més punts.</p>`:'<p class="note">Per veure-ho, indica la rotació inicial del rival a l\'alineació de cada set.</p>'}
   <h3 style="font-size:18px;margin:10px 0 6px">Parcials</h3>
   <div class="tbl-wrap"><table><thead><tr><th>Set</th><th>${esc(S.meta.equip)}</th><th>${esc(S.meta.rival)}</th></tr></thead><tbody>${setRows||'<tr><td colspan="3">Encara no hi ha punts.</td></tr>'}</tbody></table></div>`;
 }
@@ -734,12 +859,12 @@ function bindInf(der,st){
 
 /* ---------- Configuració i CSV ---------- */
 function toCSV(){
-  const {der}=replay();const h=['id','tipus','temps_s','set','marcador_nos','marcador_rival','rotacio','serveix','dorsal','jugador','fonament','valoracio','zona_origen','zona_desti','guanya','automatic','de_accio','rot_nova','serv_nou','surt','entra','detall'];
+  const {der}=replay();const h=['id','tipus','temps_s','set','marcador_nos','marcador_rival','rotacio','serveix','dorsal','jugador','fonament','valoracio','zona_origen','zona_desti','guanya','automatic','de_accio','rot_nova','serv_nou','surt','entra','detall','rotacio_rival','valor'];
   const q=v=>{v=v==null?'':String(v);return /[",\n;]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
   const blank=n=>Array(n).fill('');
-  const jr=S.jug.map(j=>['','jugador','','','','','','',j.num,j.nom,...blank(11),j.pos||'']);
-  const ar=Object.keys(S.alin).filter(k=>validAlin(S.alin[k])).map(k=>{const a=S.alin[k];return ['','alineacio','',k,'','','','',...blank(13),`${a.pos.join('-')}|${a.lib||''}|${a.serv||''}`]});
-  const er=der.map(e=>[e.id,e.tipus,e.t,e.c.set,e.c.nos,e.c.ells,e.c.rot,e.c.serv,e.jug,e.jug!=null?jname(e.jug):'',e.fon,e.val,e.zi,e.zf,e.guanya,e.tipus==='punt'?(e.auto?1:0):'',e.of,e.tipus==='rot'?(e.d||e.rot):'',e.serv,e.surt,e.entra,e.c.court?e.c.court.join('-'):'']);
+  const jr=S.jug.map(j=>['','jugador','','','','','','',j.num,j.nom,...blank(11),j.pos||'','','']);
+  const ar=Object.keys(S.alin).filter(k=>validAlin(S.alin[k])).map(k=>{const a=S.alin[k];return ['','alineacio','',k,'','','','',...blank(13),`${a.pos.join('-')}|${a.lib||''}|${a.serv||''}|${a.lib2||''}|${(a.libPer||[]).join('.')}|${a.libMode||'auto'}|${a.rivRot||''}`,'','']});
+  const er=der.map(e=>[e.id,e.tipus,e.t,e.c.set,e.c.nos,e.c.ells,e.c.rot,e.c.serv,e.jug,e.jug!=null?jname(e.jug):'',e.fon,e.val,e.zi,e.zf,e.guanya,e.tipus==='punt'?(e.auto?1:0):'',e.of,e.tipus==='rot'?(e.d||e.rot):'',e.serv,e.tipus==='libin'?e.per:e.surt,e.tipus==='libin'||e.tipus==='libcur'?e.lib:e.entra,e.c.court?e.c.court.join('-'):'',e.c.rr||'',e.tipus==='libmode'?e.mode:e.tipus==='rrot'?e.d:'']);
   return [h].concat(jr,ar,er).map(r=>r.map(q).join(',')).join('\n');
 }
 function fromCSV(txt){
@@ -748,10 +873,14 @@ function fromCSV(txt){
   const ev=[];let max=0;const alin={};const jug=[];
   lines.forEach(l=>{const c=splitCSV(l);const g=k=>c[ix(k)]||'';const tp=g('tipus');
     if(tp==='jugador'){jug.push({num:+g('dorsal'),nom:g('jugador'),pos:g('detall')});return}
-    if(tp==='alineacio'){const [p,lb,sv]=g('detall').split('|');alin[+g('set')]={pos:p.split('-').map(Number),lib:+lb||null,serv:sv||'nos'};return}
+    if(tp==='alineacio'){const [p,lb,sv,l2,per,md,rr]=g('detall').split('|');alin[+g('set')]={pos:p.split('-').map(Number),lib:+lb||null,serv:sv||'nos',lib2:+l2||null,libPer:per?per.split('.').map(Number):undefined,libMode:md||'auto',rivRot:+rr||null};return}
     const id=+g('id');max=Math.max(max,id);
     const e={id,tipus:tp,t:+g('temps_s')||0};
     if(tp==='canvi'){e.surt=+g('surt');e.entra=+g('entra')}
+    if(tp==='libin'){e.per=+g('surt');e.lib=+g('entra')}
+    if(tp==='libcur')e.lib=+g('entra');
+    if(tp==='libmode')e.mode=g('valor')||'auto';
+    if(tp==='rrot')e.d=+g('valor')||1;
     if(tp==='acc'){e.jug=+g('dorsal');e.fon=g('fonament');e.val=g('valoracio');e.zi=+g('zona_origen')||null;e.zf=+g('zona_desti')||null;
       if(!S.jug.find(j=>j.num===e.jug))S.jug.push({num:e.jug,nom:g('jugador')||'Dorsal '+e.jug,pos:''})}
     else if(tp==='punt'){e.guanya=g('guanya');e.auto=g('automatic')==='1';e.of=+g('de_accio')||null}
@@ -820,8 +949,8 @@ function render(){
   $('#mTitle').innerHTML=esc(S.meta.nom)+(S.meta.exemple?'<span class="badge">Exemple</span>':'');
   $('#mSub').textContent=[S.meta.data,S.ev.filter(e=>e.tipus==='acc').length+' accions registrades'].filter(Boolean).join(' · ');
   $('#nNos').textContent=S.meta.equip;$('#nElls').textContent=S.meta.rival;
-  $('#sNos').textContent=st.nos;$('#sElls').textContent=st.ells;$('#sSet').textContent=st.set;
-  $('#wNos').textContent=st.wn;$('#wElls').textContent=st.we;$('#sRot').textContent='R'+st.rot;
+  $('#sNos').textContent=st.nos;$('#sElls').textContent=st.ells;$('#sSet').textContent=(st.wn===3||st.we===3)?st.set-1:st.set;
+  $('#wNos').textContent=st.wn;$('#wElls').textContent=st.we;$('#sRot').textContent='R'+st.rot;$('#sRR').textContent=st.rr?'R'+st.rr:'–';
   $('#dNos').classList.toggle('on',st.serv==='nos');$('#dElls').classList.toggle('on',st.serv==='ells');
   renderPicker();renderView();
 }

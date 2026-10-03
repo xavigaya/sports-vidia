@@ -1,0 +1,4 @@
+numpy>=1.26
+scipy>=1.11
+opencv-python>=4.9
+imageio-ffmpeg>=0.5

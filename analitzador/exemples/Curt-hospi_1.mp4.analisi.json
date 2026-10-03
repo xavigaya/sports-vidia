@@ -1,0 +1,273 @@
+{
+ "app": "sports-vidia-analisi",
+ "versio": "0.1.0",
+ "video": {
+  "nom": "Curt-hospi_1.mp4",
+  "durada": 298.5,
+  "amplada": 1920,
+  "alcada": 1080
+ },
+ "calibratge": {
+  "cantonades": [
+   [
+    0.0977,
+    0.8861
+   ],
+   [
+    0.8695,
+    0.8278
+   ],
+   [
+    0.5508,
+    0.3639
+   ],
+   [
+    0.2641,
+    0.3556
+   ]
+  ]
+ },
+ "parametres": {
+  "xiulet_banda_hz": [
+   2000,
+   5000
+  ],
+  "xiulet_llindar": 1.0,
+  "xiulet_min_sep_s": 1.5,
+  "servei_finestra_s": 9.0,
+  "servei_llindar": 0.02,
+  "servei_durada_s": 0.7,
+  "moviment_ratio": 1.25,
+  "fusio_servei_s": 6.0,
+  "fps_analisi": 10,
+  "amplada_analisi": 320
+ },
+ "xiulet_hz": 3225,
+ "xiulets": [
+  {
+   "t": 54.78,
+   "forca": 1.91
+  },
+  {
+   "t": 72.58,
+   "forca": 1.35
+  },
+  {
+   "t": 76.58,
+   "forca": 1.06
+  },
+  {
+   "t": 96.14,
+   "forca": 1.24
+  },
+  {
+   "t": 102.86,
+   "forca": 1.51
+  },
+  {
+   "t": 108.45,
+   "forca": 1.2
+  },
+  {
+   "t": 124.62,
+   "forca": 1.94
+  },
+  {
+   "t": 144.7,
+   "forca": 1.15
+  },
+  {
+   "t": 155.78,
+   "forca": 1.34
+  },
+  {
+   "t": 160.38,
+   "forca": 1.72
+  },
+  {
+   "t": 177.18,
+   "forca": 1.41
+  },
+  {
+   "t": 193.65,
+   "forca": 1.81
+  },
+  {
+   "t": 236.83,
+   "forca": 2.03
+  },
+  {
+   "t": 264.8,
+   "forca": 1.17
+  },
+  {
+   "t": 275.87,
+   "forca": 1.85
+  },
+  {
+   "t": 281.31,
+   "forca": 1.44
+  },
+  {
+   "t": 294.98,
+   "forca": 1.71
+  },
+  {
+   "t": 297.98,
+   "forca": 1.05
+  }
+ ],
+ "jugades": [
+  {
+   "n": 1,
+   "inici": 9.6,
+   "final": 12.6,
+   "xiulet": null,
+   "costat_servei": "proper",
+   "confianca_servei": 1.0,
+   "guanya_costat": "llunya",
+   "confianca": 0.4
+  },
+  {
+   "n": 2,
+   "inici": 29.0,
+   "final": 40.3,
+   "xiulet": null,
+   "costat_servei": "llunya",
+   "confianca_servei": 0.4,
+   "guanya_costat": "llunya",
+   "confianca": 0.4
+  },
+  {
+   "n": 3,
+   "inici": 47.0,
+   "final": 54.8,
+   "xiulet": null,
+   "costat_servei": "llunya",
+   "confianca_servei": 0.4,
+   "guanya_costat": "llunya",
+   "confianca": 0.4
+  },
+  {
+   "n": 4,
+   "inici": 57.8,
+   "final": 72.6,
+   "xiulet": 54.78,
+   "costat_servei": "llunya",
+   "confianca_servei": 0.7,
+   "guanya_costat": "proper",
+   "confianca": 0.7
+  },
+  {
+   "n": 5,
+   "inici": 82.7,
+   "final": 96.1,
+   "xiulet": 76.58,
+   "costat_servei": "proper",
+   "confianca_servei": 1.0,
+   "guanya_costat": "proper",
+   "confianca": 0.94
+  },
+  {
+   "n": 6,
+   "inici": 101.7,
+   "final": 108.5,
+   "xiulet": 96.14,
+   "costat_servei": "proper",
+   "confianca_servei": 0.94,
+   "guanya_costat": "llunya",
+   "confianca": 0.72
+  },
+  {
+   "n": 7,
+   "inici": 127.6,
+   "final": 144.7,
+   "xiulet": 124.62,
+   "costat_servei": "llunya",
+   "confianca_servei": 0.72,
+   "guanya_costat": "proper",
+   "confianca": 0.72
+  },
+  {
+   "n": 8,
+   "inici": 156.4,
+   "final": 158.4,
+   "xiulet": 155.78,
+   "costat_servei": "proper",
+   "confianca_servei": 1.0,
+   "guanya_costat": "proper",
+   "confianca": 1.0
+  },
+  {
+   "n": 9,
+   "inici": 163.0,
+   "final": 177.2,
+   "xiulet": 160.38,
+   "costat_servei": "proper",
+   "confianca_servei": 1.0,
+   "guanya_costat": "proper",
+   "confianca": 1.0
+  },
+  {
+   "n": 10,
+   "inici": 188.6,
+   "final": 193.7,
+   "xiulet": 177.18,
+   "costat_servei": "proper",
+   "confianca_servei": 1.0,
+   "guanya_costat": "proper",
+   "confianca": 1.0
+  },
+  {
+   "n": 11,
+   "inici": 197.0,
+   "final": 220.1,
+   "xiulet": 193.65,
+   "costat_servei": "proper",
+   "confianca_servei": 1.0,
+   "guanya_costat": "llunya",
+   "confianca": 0.8
+  },
+  {
+   "n": 12,
+   "inici": 239.8,
+   "final": 243.9,
+   "xiulet": 236.83,
+   "costat_servei": "llunya",
+   "confianca_servei": 0.8,
+   "guanya_costat": "proper",
+   "confianca": 0.8
+  },
+  {
+   "n": 13,
+   "inici": 246.9,
+   "final": 264.8,
+   "xiulet": 236.83,
+   "costat_servei": "proper",
+   "confianca_servei": 1.0,
+   "guanya_costat": "llunya",
+   "confianca": 0.8
+  },
+  {
+   "n": 14,
+   "inici": 278.9,
+   "final": 281.3,
+   "xiulet": 275.87,
+   "costat_servei": "llunya",
+   "confianca_servei": 0.8,
+   "guanya_costat": "proper",
+   "confianca": 0.8
+  },
+  {
+   "n": 15,
+   "inici": 290.8,
+   "final": 295.0,
+   "xiulet": 281.31,
+   "costat_servei": "proper",
+   "confianca_servei": 1.0,
+   "guanya_costat": null,
+   "confianca": 0.0
+  }
+ ],
+ "creat": "2026-10-03 21:46"
+}

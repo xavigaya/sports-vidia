@@ -1,6 +1,6 @@
 # Anàlisi automàtica del vídeo — pla
 
-Estat: proposta, pendent de vídeos de mostra.
+Estat: **fase 1 en funcionament (v0.1)**. Provada amb dos clips de 5 minuts (Curt-hospi_1 i _2).
 
 ## Decisions preses
 - Vídeos: propis i d'altres. L'anàlisi automàtica es fa amb **vídeos propis** (fitxer MP4 original o descarregat des de YouTube Studio). Els vídeos d'altres canals es continuen analitzant amb el registre manual, tret que en tinguem el fitxer amb permís.
@@ -33,3 +33,12 @@ Estat: proposta, pendent de vídeos de mostra.
 - 2-3 partits propis en MP4 amb el marcador real de cada set (per mesurar l'encert).
 - Una captura de la pista tal com es veu a la càmera.
 - Dades del PC: sistema operatiu, model de gràfica, i si té Python instal·lat.
+
+## Resultats de la primera prova (clips de 5 min, 1080p 30 fps)
+- Xiulet de l'àrbitre a **3.225 Hz**, detectat als dos clips. Els crits i les sabatilles fan soroll a la mateixa banda; per això es busca una banda estreta al voltant de la freqüència calculada.
+- La presència del servidor darrere la línia propera és un senyal net (0 % fora de servei, 4-8 % durant el servei).
+- La zona darrere la línia llunyana no serveix (hi ha gent i la paret): els serveis llunyans es dedueixen del xiulet i de la pujada de moviment.
+- Clip 1: 15 jugades proposades. Clip 2: 20. Pendent de comparar amb el marcador real per mesurar l'encert.
+
+## PC de l'usuari
+- NVIDIA GeForce RTX 3070 Laptop, Python 3.13.7.

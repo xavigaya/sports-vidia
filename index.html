@@ -1,0 +1,846 @@
+<!doctype html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Scouting de partits de vòlei a partir de vídeos de YouTube.">
+<meta name="theme-color" content="#1F4E8C">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="VidIA Vòlei">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<title>Sports VidIA Vòlei</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: marcador a dalt; columna esquerra = vídeo + entrada ràpida, columna dreta = pestanyes d'anàlisi. Una sola columna en mòbil. */
+:root{
+  --bg:#F2F5F9; --surface:#FFFFFF; --ink:#132033; --muted:#5A6779; --line:#D8DEE8;
+  --court:#E8EEF6; --blue:#1F4E8C; --blue-ink:#FFFFFF; --ball:#E8A900; --good:#1C8A57; --bad:#C23E2C;
+  --f-disp:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0D141F; --surface:#151E2C; --ink:#E5EBF3; --muted:#93A0B4; --line:#283447;
+  --court:#1B2738; --blue:#5B92DC; --blue-ink:#0D141F; --ball:#F4C232; --good:#3DBB82; --bad:#E8705E; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0D141F; --surface:#151E2C; --ink:#E5EBF3; --muted:#93A0B4; --line:#283447;
+  --court:#1B2738; --blue:#5B92DC; --blue-ink:#0D141F; --ball:#F4C232; --good:#3DBB82; --bad:#E8705E; color-scheme:dark}
+*{box-sizing:border-box}
+html{color-scheme:light}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0}
+img{max-width:100%}
+[hidden]{display:none!important}
+
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45}
+.wrap{max-width:1320px;margin:0 auto;padding-inline:16px;padding-block:14px 40px;display:grid;gap:14px}
+h1,h2,h3{font-family:var(--f-disp);font-weight:700;letter-spacing:.01em;margin:0;text-wrap:balance}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--ball);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.label{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+
+/* Marcador */
+.board{display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 16px}
+.board .title{flex:1 1 220px;min-width:0}
+.board .title h1{font-size:26px;line-height:1.1}
+.badge{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:4px;background:var(--ball);color:#1b1400;vertical-align:middle;margin-left:6px}
+.score{display:flex;align-items:center;gap:14px;font-family:var(--f-disp)}
+.team{display:grid;justify-items:center;gap:2px;min-width:70px}
+.team .n{font-size:13px;color:var(--muted);font-family:var(--f-body);font-weight:600;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.team .p{font-size:44px;line-height:1;font-weight:700}
+.team .sw{font-size:13px;color:var(--muted)}
+.serve-dot{width:10px;height:10px;border-radius:50%;background:var(--ball);display:inline-block;visibility:hidden}
+.serve-dot.on{visibility:visible}
+.setinfo{display:grid;justify-items:center;font-family:var(--f-body)}
+.setinfo b{font-family:var(--f-disp);font-size:22px}
+.rotbox{display:grid;justify-items:center;gap:2px}
+.rotbox .r{font-family:var(--f-disp);font-size:30px;font-weight:700;color:var(--blue)}
+.mini-btns{display:flex;gap:4px}
+.mini{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:2px 8px;font-size:13px}
+.mini:hover{border-color:var(--blue)}
+
+.main{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:14px;align-items:start}
+@media (max-width:980px){.main{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;display:grid;gap:12px;min-width:0}
+.panel h2{font-size:20px}
+
+/* Vídeo */
+.video{position:relative;width:100%;max-width:100%;aspect-ratio:16/9;background:var(--court);border-radius:8px;overflow:hidden;display:grid;place-items:center}
+.video #yt{position:absolute;inset:0;width:100%;height:100%}
+.video .ph{padding:18px;text-align:center;color:var(--muted);max-width:44ch}
+.clock{display:grid;gap:10px}
+.clock .t{font-family:var(--f-mono);font-size:34px;letter-spacing:.02em}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:7px;padding:7px 12px;font-weight:600}
+.btn:hover{border-color:var(--blue)}
+.btn.pri{background:var(--blue);border-color:var(--blue);color:var(--blue-ink)}
+.btn.good{border-color:var(--good);color:var(--good)}
+.btn.bad{border-color:var(--bad);color:var(--bad)}
+.inp{border:1px solid var(--line);background:var(--bg);border-radius:7px;padding:7px 10px;min-width:0}
+.note{font-size:13px;color:var(--muted)}
+a{color:var(--blue)}
+
+/* Entrada */
+.step{display:grid;gap:6px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--bg);border-radius:7px;padding:6px 10px;min-width:44px;font-weight:600;text-align:center}
+.chip small{display:block;font-weight:500;font-size:11px;color:var(--muted);max-width:76px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip.on{background:var(--blue);border-color:var(--blue);color:var(--blue-ink)}
+.chip.on small{color:inherit;opacity:.85}
+.chip.v{font-family:var(--f-mono);font-size:18px;min-width:52px}
+.chip.v small{font-family:var(--f-body)}
+.chip:hover{border-color:var(--blue)}
+.zones{display:flex;flex-wrap:wrap;gap:14px}
+.zgrid{display:grid;grid-template-columns:repeat(3,38px);gap:3px;background:var(--line);padding:3px;border-radius:6px}
+.zgrid button{height:32px;border:0;background:var(--court);border-radius:3px;font-weight:600}
+.zgrid button.on{background:var(--ball);color:#1b1400}
+.codebar{display:flex;gap:8px}
+.codebar .inp{flex:1;font-family:var(--f-mono);font-size:16px}
+.pending{font-family:var(--f-mono);font-size:14px;color:var(--muted);min-height:20px}
+
+/* Pestanyes */
+.tabs{display:flex;flex-wrap:wrap;gap:4px;border-bottom:1px solid var(--line);padding-bottom:8px}
+.tab{border:0;background:none;padding:6px 10px;border-radius:6px;font-weight:600;color:var(--muted)}
+.tab.on{background:var(--court);color:var(--ink)}
+.filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;font-size:14px}
+th,td{padding:6px 9px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600;background:var(--bg)}
+th:first-child,td:first-child{text-align:left}
+tr:last-child td{border-bottom:0}
+td.g{color:var(--good);font-weight:600}
+td.b{color:var(--bad);font-weight:600}
+.bar{display:inline-block;height:8px;border-radius:2px;background:var(--blue);vertical-align:middle;margin-left:6px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.kpi{border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.kpi b{display:block;font-family:var(--f-disp);font-size:26px}
+.log{display:grid;gap:0;max-height:520px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.li{display:grid;grid-template-columns:62px 54px minmax(0,1fr) auto;gap:8px;align-items:center;padding:6px 10px;border-bottom:1px solid var(--line);font-size:14px}
+.li:last-child{border-bottom:0}
+.li .code{font-family:var(--f-mono)}
+.li .ctx{color:var(--muted);font-size:12px}
+.li.pt{background:var(--bg)}
+.del{border:0;background:none;color:var(--muted);font-size:16px;padding:2px 6px}
+.del:hover{color:var(--bad)}
+.tlink{font-family:var(--f-mono);font-size:13px;border:0;background:none;color:var(--blue);padding:0;text-decoration:underline;text-align:left}
+.court-wrap{display:flex;flex-wrap:wrap;gap:18px;align-items:flex-start}
+.court-wrap svg{width:280px;max-width:100%;height:auto}
+.legend{display:grid;gap:6px;font-size:14px;min-width:0;flex:1 1 200px}
+textarea.inp{width:100%;min-height:150px;font-family:var(--f-mono);font-size:13px}
+.cfg{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.cfg label{display:grid;gap:4px;font-size:13px;color:var(--muted);font-weight:600}
+.pista{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;background:var(--line);padding:4px;border-radius:8px;border-top:4px solid var(--ink)}
+.pista button{border:0;background:var(--court);border-radius:5px;padding:7px 4px;display:grid;justify-items:center;min-width:0}
+.pista button b{font-family:var(--f-disp);font-size:24px;line-height:1.05}
+.pista button small{font-size:11px;color:var(--muted);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pista button .pp{font-size:10px;letter-spacing:.08em;color:var(--muted);font-weight:600}
+.pista button.on{background:var(--blue);color:var(--blue-ink)}
+.pista button.on small,.pista button.on .pp{color:inherit}
+.pista button.srv{box-shadow:inset 0 0 0 2px var(--ball)}
+.pista .empty{grid-column:1/-1;padding:16px;text-align:center;color:var(--muted);background:var(--court);border-radius:5px}
+.agrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.flabel{display:grid;gap:3px;font-size:12px;color:var(--muted);font-weight:600;min-width:0}
+.sub{display:grid;gap:8px;border:1px solid var(--line);border-radius:8px;padding:10px}
+.warn{border:1px solid var(--ball);background:color-mix(in srgb,var(--ball) 14%,var(--surface));border-radius:8px;padding:8px 10px;font-size:14px}
+.insights{display:grid;gap:5px;padding-left:18px;margin:0;max-width:65ch}
+.rep-head{display:flex;flex-wrap:wrap;gap:8px 20px;align-items:baseline}
+.rep-head .res{font-family:var(--f-disp);font-size:34px;font-weight:700}
+.toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:8px;font-weight:600;opacity:0;transition:opacity .2s;pointer-events:none;z-index:9}
+.toast.on{opacity:1}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}}
+.offline{font-size:12px;font-weight:600;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:2px 8px}
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+  <header class="board">
+    <div class="title">
+      <h1 id="mTitle">Partit</h1>
+      <div class="muted" id="mSub"></div>
+      <div class="row" style="margin-top:6px"><button class="btn pri" id="installBtn" hidden>Instal·la l'app</button><span class="offline" id="offBadge" hidden>Sense connexió</span></div>
+    </div>
+    <div class="score">
+      <div class="team"><span class="n" id="nNos">Nosaltres</span><span class="p num" id="sNos">0</span><span class="sw num"><span class="serve-dot" id="dNos"></span> sets <b id="wNos">0</b></span></div>
+      <div class="setinfo"><span class="label">Set</span><b class="num" id="sSet">1</b></div>
+      <div class="team"><span class="n" id="nElls">Rival</span><span class="p num" id="sElls">0</span><span class="sw num"><span class="serve-dot" id="dElls"></span> sets <b id="wElls">0</b></span></div>
+    </div>
+    <div class="rotbox">
+      <span class="label">Rotació</span>
+      <span class="r num" id="sRot">R1</span>
+      <div class="mini-btns">
+        <button class="mini" id="rotPrev" title="Rotació anterior">−</button>
+        <button class="mini" id="rotNext" title="Rotació següent">+</button>
+        <button class="mini" id="servTog" title="Canvia qui serveix">Saque</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="main">
+    <section class="panel" aria-label="Vídeo i registre">
+      <div class="video" id="videoBox">
+        <div id="yt"></div>
+        <div class="ph" id="videoPh">Enganxa l'enllaç de YouTube a la pestanya <b>Partit</b>.</div>
+      </div>
+      <div class="clock" id="clockBox">
+        <div class="row" style="justify-content:space-between">
+          <div>
+            <div class="label" id="clockLabel">Temps del vídeo</div>
+            <div class="t num" id="clockT">0:00</div>
+          </div>
+          <a id="ytOpen" href="#" target="_blank" rel="noopener" class="btn">Obre a YouTube ↗</a>
+        </div>
+        <div class="row" id="clockCtrls">
+          <button class="btn pri" id="clkPlay">▶ Reprodueix</button>
+          <button class="btn" data-skip="-5">−5 s</button>
+          <button class="btn" data-skip="5">+5 s</button>
+          <input class="inp num" id="clkSet" placeholder="m:ss" style="width:80px" aria-label="Fixa el temps">
+          <button class="btn" id="clkSetBtn">Fixa</button>
+        </div>
+        <div class="note" id="clockNote">Mode rellotge: obre el vídeo a YouTube i prem Reprodueix alhora. Si el vídeo i el rellotge es desquadren, escriu el minut que veus i prem Fixa.</div>
+      </div>
+
+      <div class="row" style="justify-content:space-between"><h2>Pista</h2><span class="note num" id="subsInfo"></span></div>
+      <div class="warn" id="alinWarn" hidden></div>
+      <div class="pista" id="pista"></div>
+      <div class="note" id="libInfo"></div>
+      <div class="row">
+        <button class="btn" id="btnAlin">Alineació</button>
+        <button class="btn" id="btnCanvi">Canvi</button>
+      </div>
+      <div class="sub" id="alinBox" hidden></div>
+      <div class="sub" id="canviBox" hidden></div>
+
+      <h2>Acció</h2>
+      <div class="codebar">
+        <input class="inp" id="code" placeholder="Codi ràpid: 7A#46" autocomplete="off" aria-label="Codi ràpid">
+        <button class="btn pri" id="codeGo">Registra</button>
+      </div>
+      <div class="note">Format: dorsal + fonament (S R E A B D) + valoració (# + ! - =) + zona origen + zona destí opcionals. Amb alineació, el servei no necessita dorsal (<span style="font-family:var(--f-mono)">S+</span>). Ex.: <span class="code" style="font-family:var(--f-mono)">13S=</span>, <span style="font-family:var(--f-mono)">4A#26</span>.</div>
+
+      <div class="step"><span class="label">1 · Jugador/a</span><div class="chips" id="pJug"></div></div>
+      <div class="step"><span class="label">2 · Fonament</span><div class="chips" id="pFon"></div></div>
+      <div class="step"><span class="label">3 · Zones (opcional)</span>
+        <div class="zones">
+          <div><div class="note">Origen</div><div class="zgrid" id="pZi"></div></div>
+          <div><div class="note">Destí</div><div class="zgrid" id="pZf"></div></div>
+        </div>
+      </div>
+      <div class="step"><span class="label">4 · Valoració (registra l'acció)</span><div class="chips" id="pVal"></div></div>
+      <div class="pending" id="pending"></div>
+      <div class="row">
+        <button class="btn good" id="ptNos">+1 punt nostre</button>
+        <button class="btn bad" id="ptElls">+1 punt rival</button>
+        <button class="btn" id="undo">Desfés l'últim</button>
+      </div>
+      <div class="note">Els punts per as, error, atac o bloqueig decisius es compten sols. Fes servir els botons de punt per errors del rival o jugades que no has registrat.</div>
+    </section>
+
+    <section class="panel" aria-label="Anàlisi">
+      <nav class="tabs" id="tabs"></nav>
+      <div class="filters" id="filters">
+        <span class="label">Set</span>
+        <select class="inp" id="fSet"></select>
+      </div>
+      <div id="view"></div>
+    </section>
+  </div>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(function(){
+"use strict";
+const $=s=>document.querySelector(s);
+const FON={S:'Servei',R:'Recepció',E:'Col·locació',A:'Atac',B:'Bloqueig',D:'Defensa'};
+const VALS=['#','+','!','-','='];
+const VDESC={'#':'Perfecte','+':'Positiu','!':'Regular','-':'Negatiu','=':'Error'};
+const ZLAY=[4,3,2,5,6,1];
+const KEY='vidia-volei-v2';
+
+/* ---------- Dades d'exemple ---------- */
+function rng(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function sample(){
+  const r=rng(20261003);
+  const pick=a=>a[Math.floor(r()*a.length)];
+  const wpick=d=>{let x=r(),s=0;for(const k in d){s+=d[k];if(x<s)return k}return Object.keys(d).pop()};
+  const jug=[[1,'Pol Serra','Col'],[4,'Arnau Vidal','Rec'],[7,'Marc Puig','Rec'],[9,'Jan Roca','Cen'],[11,'Biel Font','Cen'],[13,'Oriol Mas','Opo'],[2,'Nil Soler','Lli'],[5,'Pau Ribes','Rec'],[8,'Guillem Camps','Cen'],[10,'Èric Bosch','Opo'],[12,'Martí Coll','Col'],[3,'Joan Prat','Lli']].map(([num,nom,pos])=>({num,nom,pos}));
+  const alin={1:{pos:[1,4,9,13,7,11],lib:2,serv:'nos'},2:{pos:[1,4,9,13,7,11],lib:2,serv:'ells'},3:{pos:[13,7,11,1,4,9],lib:2,serv:'nos'},4:{pos:[1,4,9,13,7,11],lib:3,serv:'ells'},5:{pos:[1,4,9,13,7,11],lib:2,serv:'nos'}};
+  const ev=[];let id=1,t=95,set=1,a=0,b=0,wa=0,wb=0,subDone=false;
+  let court=alin[1].pos.slice(),serv=alin[1].serv,lib=alin[1].lib;
+  const SETTERS=[1,12];
+  const setter=()=>court.find(n=>SETTERS.includes(n))||1;
+  const acc=(j,f,v,zi,zf)=>{const e={id:id++,tipus:'acc',t:Math.round(t),jug:j,fon:f,val:v,zi:zi||null,zf:zf||null};ev.push(e);t+=2+r()*3;return e};
+  const pt=(g,of)=>{ev.push({id:id++,tipus:'punt',t:Math.round(t),guanya:g,auto:!!of,of:of||null});
+    if(g==='nos'){a++;if(serv==='ells')court=court.slice(1).concat(court[0]);serv='nos'}else{b++;serv='ells'}
+    const lim=set===5?15:25;
+    if(Math.max(a,b)>=lim&&Math.abs(a-b)>=2){if(a>b)wa++;else wb++;set++;a=b=0;t+=150;
+      if(alin[set]){court=alin[set].pos.slice();serv=alin[set].serv;lib=alin[set].lib}}
+    t+=14+r()*16;};
+  const attack=()=>{
+    const front=[1,2,3].map(i=>court[i]).filter(n=>!SETTERS.includes(n));
+    const back=[0,4,5].map(i=>court[i]).filter(n=>[13,10,4,7,5].includes(n));
+    const j=(back.length&&r()<.22)?pick(back):pick(front);
+    const i=court.indexOf(j);const zi=i===3?4:i===2?3:i===1?2:pick([1,6]);
+    const v=wpick({'#':.46,'+':.13,'!':.13,'-':.15,'=':.13});
+    const e=acc(j,'A',v,zi,pick([1,5,6,5,6,1,4,2]));
+    if(v==='#')return pt('nos',e.id);if(v==='=')return pt('ells',e.id);return pt(r()<.5?'nos':'ells')};
+  let guard=0;
+  while(wa<3&&wb<3&&guard++<400){
+    if(set===2&&!subDone&&a+b>=24&&court.includes(13)){ev.push({id:id++,tipus:'canvi',t:Math.round(t),surt:13,entra:10});court[court.indexOf(13)]=10;subDone=true;t+=20}
+    if(serv==='nos'){
+      const v=wpick({'#':.07,'+':.2,'!':.3,'-':.3,'=':.13});const e=acc(court[0],'S',v,1,pick([1,5,6,1,5]));
+      if(v==='#'){pt('nos',e.id);continue}if(v==='='){pt('ells',e.id);continue}
+      if(r()<.35){const bv=wpick({'#':.25,'+':.2,'!':.2,'-':.2,'=':.15});const bi=pick([1,2,3]);const be=acc(court[bi],'B',bv,[2,3,4][bi-1],null);
+        if(bv==='#'){pt('nos',be.id);continue}if(bv==='='){pt('ells',be.id);continue}}
+      const dv=wpick({'#':.15,'+':.25,'!':.25,'-':.15,'=':.2});const di=pick([0,4,5]);const de=acc(pick([lib,lib,court[di]]),'D',dv,[1,5,6][[0,4,5].indexOf(di)],null);
+      if(dv==='='){pt('ells',de.id);continue}
+      acc(setter(),'E',wpick({'#':.3,'+':.4,'!':.2,'-':.1}));attack();
+    }else{
+      if(r()<.09){pt('nos');continue}
+      const rec=[lib,lib].concat(court.filter(n=>[4,7,5].includes(n)));
+      const rv=wpick({'#':.25,'+':.3,'!':.2,'-':.17,'=':.08});const re=acc(pick(rec),'R',rv,pick([1,5,6]),null);
+      if(rv==='='){pt('ells',re.id);continue}
+      acc(setter(),'E',wpick({'#':.3,'+':.4,'!':.2,'-':.1}));attack();
+    }
+  }
+  return {meta:{nom:"CV Caparrella – CV Balàfia (exemple)",url:"",videoId:"",equip:"Caparrella",rival:"Balàfia",data:"2026-10-03",exemple:true},cfg:{rot0:1,serv0:'nos'},alin,jug,ev,nextId:id};
+}
+function empty(){return {meta:{nom:"Partit nou",url:"",videoId:"",equip:"Nosaltres",rival:"Rival",data:new Date().toISOString().slice(0,10),exemple:false},cfg:{rot0:1,serv0:'nos'},alin:{},jug:[],ev:[],nextId:1}}
+
+/* ---------- Estat ---------- */
+let S;
+try{const raw=localStorage.getItem(KEY);S=raw?JSON.parse(raw):null}catch(e){S=null}
+if(!S||!S.ev)S=sample();
+if(!S.alin)S.alin={};
+let ui={alin:false,canvi:false};
+let sel={jug:null,fon:null,zi:null,zf:null};
+let tab='reg',fSet='tots',heatF='A',heatJ='tots',heatMode='zf';
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+
+/* ---------- Lògica de joc ---------- */
+const nextRot=r=>r===1?6:r-1, prevRot=r=>r===6?1:r+1;
+function autoPunt(f,v){
+  if(v==='=')return 'ells';
+  if(v==='#'&&(f==='S'||f==='A'||f==='B'))return 'nos';
+  return null;
+}
+function isSetter(n){const j=S.jug.find(x=>x.num===n);return !!(j&&/^col/i.test(j.pos||''))}
+function setterPos(court){if(!court)return null;for(let i=0;i<6;i++)if(isSetter(court[i]))return i+1;return null}
+function validAlin(a){return a&&Array.isArray(a.pos)&&a.pos.length===6&&a.pos.every(n=>n)&&new Set(a.pos).size===6}
+function replay(){
+  const A=S.alin||{};
+  const st={set:1,nos:0,ells:0,rotc:S.cfg.rot0,serv:S.cfg.serv0,wn:0,we:0,sets:[],court:null,lib:null,subs:0};
+  const startSet=()=>{const a=A[st.set];st.subs=0;
+    if(validAlin(a)){st.court=a.pos.slice();st.lib=a.lib||null;if(a.serv)st.serv=a.serv;st.rotc=1}};
+  const R=()=>setterPos(st.court)||st.rotc;
+  const shift=d=>{if(st.court)st.court=d>0?st.court.slice(1).concat(st.court[0]):[st.court[5]].concat(st.court.slice(0,5));st.rotc=d>0?nextRot(st.rotc):prevRot(st.rotc)};
+  startSet();
+  const der=S.ev.map(e=>{
+    const c={set:st.set,nos:st.nos,ells:st.ells,rot:R(),serv:st.serv,court:st.court?st.court.slice():null};
+    if(e.tipus==='rot'){if(e.d)shift(e.d);else if(e.rot)st.rotc=e.rot}
+    else if(e.tipus==='serv')st.serv=e.serv;
+    else if(e.tipus==='canvi'){if(st.court){const i=st.court.indexOf(e.surt);if(i>=0)st.court[i]=e.entra}st.subs++}
+    else if(e.tipus==='punt'){
+      if(e.guanya==='nos'){st.nos++;if(st.serv==='ells'){shift(1);st.serv='nos'}}
+      else{st.ells++;st.serv='ells'}
+      const lim=st.set===5?15:25;
+      if(Math.max(st.nos,st.ells)>=lim&&Math.abs(st.nos-st.ells)>=2){
+        st.sets.push({set:st.set,nos:st.nos,ells:st.ells});
+        if(st.nos>st.ells)st.wn++;else st.we++;
+        st.set++;st.nos=0;st.ells=0;startSet();
+      }
+    }
+    return Object.assign({},e,{c});
+  });
+  st.rot=R();
+  return {der,st};
+}
+
+/* ---------- Vídeo ---------- */
+let player=null,ytReady=false,mode='clock',booted=false;
+const clk={base:0,start:0,run:false};
+function ytId(u){if(!u)return'';const m=u.match(/(?:youtu\.be\/|v=|\/embed\/|\/shorts\/|\/live\/)([\w-]{11})/);return m?m[1]:(/^[\w-]{11}$/.test(u)?u:'')}
+function curTime(){
+  if(mode==='yt'&&player&&player.getCurrentTime)return player.getCurrentTime()||0;
+  return clk.base+(clk.run?(Date.now()-clk.start)/1000:0);
+}
+function fmt(s){s=Math.max(0,Math.floor(s||0));const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60;return(h?h+':'+String(m).padStart(2,'0'):m)+':'+String(x).padStart(2,'0')}
+function parseT(v){const p=String(v).trim().split(':').map(Number);if(p.some(isNaN))return null;return p.reduce((a,b)=>a*60+b,0)}
+function ytLink(t){return S.meta.videoId?`https://www.youtube.com/watch?v=${S.meta.videoId}&t=${Math.floor(t||0)}s`:'#'}
+function seek(t){
+  if(mode==='yt'&&player&&player.seekTo){player.seekTo(t,true);player.playVideo&&player.playVideo();return true}
+  return false;
+}
+function setMode(m,why){
+  mode=m;
+  $('#clockCtrls').hidden=(m==='yt');
+  $('#clockNote').hidden=(m==='yt');
+  $('#clockLabel').textContent=m==='yt'?'Temps del vídeo (reproductor)':'Temps del vídeo (rellotge)';
+  if(m==='clock'){$('#yt').innerHTML='';$('#videoPh').hidden=false;
+    $('#videoPh').innerHTML=S.meta.videoId?(why||'El reproductor de YouTube no es pot carregar aquí.')+' Obre el vídeo a YouTube i segueix-lo amb el rellotge de sota.':"Enganxa l'enllaç de YouTube a la pestanya <b>Partit</b>."}
+  if(booted&&tab==='reg')renderView();
+}
+function makePlayer(){
+  if(!ytReady||!S.meta.videoId){setMode('clock');return}
+  $('#videoPh').hidden=true;
+  if(player&&player.loadVideoById){player.cueVideoById(S.meta.videoId);setMode('yt');return}
+  player=new YT.Player('yt',{videoId:S.meta.videoId,playerVars:{rel:0,playsinline:1,origin:location.origin},
+    events:{onReady:()=>setMode('yt'),onError:()=>{player=null;setMode('clock','YouTube no permet reproduir aquest vídeo incrustat.')}}});
+}
+window.onYouTubeIframeAPIReady=function(){ytReady=true;makePlayer()};
+(function loadYT(){
+  setMode('clock');
+  const s=document.createElement('script');s.src='https://www.youtube.com/iframe_api';
+  s.onerror=()=>setMode('clock');document.head.appendChild(s);
+})();
+setInterval(()=>{$('#clockT').textContent=fmt(curTime());const l=$('#ytOpen');l.href=ytLink(curTime());l.style.visibility=S.meta.videoId?'visible':'hidden'},250);
+$('#clkPlay').onclick=()=>{if(clk.run){clk.base=curTime();clk.run=false}else{clk.start=Date.now();clk.run=true}$('#clkPlay').textContent=clk.run?'❚❚ Pausa':'▶ Reprodueix'};
+document.querySelectorAll('[data-skip]').forEach(b=>b.onclick=()=>{const n=curTime()+Number(b.dataset.skip);clk.base=Math.max(0,n);clk.start=Date.now()});
+$('#clkSetBtn').onclick=()=>{const t=parseT($('#clkSet').value);if(t==null)return toast('Escriu el temps com m:ss');clk.base=t;clk.start=Date.now();$('#clkSet').value=''};
+
+/* ---------- Registre ---------- */
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(toast.h);toast.h=setTimeout(()=>t.classList.remove('on'),1600)}
+function addAcc(jug,fon,val,zi,zf){
+  const id=S.nextId++;const t=Math.round(curTime()*10)/10;
+  S.ev.push({id,tipus:'acc',t,jug,fon,val,zi:zi||null,zf:zf||null});
+  if(!S.jug.find(j=>j.num===jug))S.jug.push({num:jug,nom:'Dorsal '+jug,pos:''});
+  const g=autoPunt(fon,val);
+  if(g)S.ev.push({id:S.nextId++,tipus:'punt',t,guanya:g,auto:true,of:id});
+  S.meta.exemple=false;save();
+  toast(`${jug}${fon}${val}${zi||''}${zf||''}`+(g?(g==='nos'?' · punt nostre':' · punt rival'):''));
+  sel={jug:null,fon:null,zi:null,zf:null};render();
+}
+function addPunt(g){S.ev.push({id:S.nextId++,tipus:'punt',t:Math.round(curTime()*10)/10,guanya:g,auto:false,of:null});save();render()}
+function delEv(id){S.ev=S.ev.filter(e=>e.id!==id&&e.of!==id);save();render()}
+$('#ptNos').onclick=()=>addPunt('nos');
+$('#ptElls').onclick=()=>addPunt('ells');
+$('#undo').onclick=()=>{const l=S.ev[S.ev.length-1];if(!l)return;const id=l.of||l.id;delEv(id);toast('Desfet')};
+$('#rotNext').onclick=()=>{S.ev.push({id:S.nextId++,tipus:'rot',t:curTime(),d:1});save();render()};
+$('#rotPrev').onclick=()=>{S.ev.push({id:S.nextId++,tipus:'rot',t:curTime(),d:-1});save();render()};
+$('#servTog').onclick=()=>{const {st}=replay();S.ev.push({id:S.nextId++,tipus:'serv',t:curTime(),serv:st.serv==='nos'?'ells':'nos'});save();render()};
+function runCode(){
+  const v=$('#code').value.trim();if(!v)return;
+  const m=v.match(/^(\d{1,2})?\s*([SREABDsreabd])\s*([#+!\-=])\s*([1-6])?\s*([1-6])?$/);
+  if(!m)return toast('Codi no vàlid. Exemple: 7A#46');
+  const f=m[2].toUpperCase();let j=m[1]?+m[1]:null;
+  if(j==null){const sv=autoServer();if(f==='S'&&sv)j=sv;else return toast('Falta el dorsal')}
+  addAcc(j,f,m[3],m[4]?+m[4]:null,m[5]?+m[5]:null);$('#code').value='';
+}
+$('#codeGo').onclick=runCode;
+$('#code').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();runCode()}});
+
+function renderPicker(){
+  const sorted=[...S.jug].sort((a,b)=>a.num-b.num);
+  $('#pJug').innerHTML=sorted.length?sorted.map(j=>`<button class="chip ${sel.jug===j.num?'on':''}" data-j="${j.num}">${j.num}<small>${esc(j.nom.split(' ')[0])}</small></button>`).join(''):'<span class="note">Afegeix la plantilla a la pestanya Partit.</span>';
+  $('#pFon').innerHTML=Object.keys(FON).map(k=>`<button class="chip ${sel.fon===k?'on':''}" data-f="${k}">${k}<small>${FON[k]}</small></button>`).join('');
+  const z=(w)=>ZLAY.map(n=>`<button class="${sel[w]===n?'on':''}" data-z="${w}" data-n="${n}">${n}</button>`).join('');
+  $('#pZi').innerHTML=z('zi');$('#pZf').innerHTML=z('zf');
+  $('#pVal').innerHTML=VALS.map(v=>`<button class="chip v" data-v="${encodeURIComponent(v)}">${v}<small>${VDESC[v]}</small></button>`).join('');
+  $('#pending').textContent=(sel.jug||sel.fon)?`${sel.jug??'?'}${sel.fon??'?'}·${sel.zi??''}${sel.zf??''}`:'';
+  renderPista();
+}
+
+/* ---------- Pista, alineacions i canvis ---------- */
+function autoServer(){const {st}=replay();return st.court&&st.serv==='nos'?st.court[0]:null}
+function first(n){const j=S.jug.find(x=>x.num===n);return j?j.nom.split(' ')[0]:''}
+function renderPista(){
+  const {st}=replay();
+  const has=validAlin(S.alin[st.set]);
+  const w=$('#alinWarn');
+  if(!has&&st.court){w.hidden=false;w.textContent=`El set ${st.set} no té alineació pròpia: es manté la pista del set anterior. Revisa-la amb Alineació.`}
+  else if(!st.court&&S.jug.length){w.hidden=false;w.textContent=`Defineix l'alineació inicial del set ${st.set} per seguir rotacions, servidors i canvis.`}
+  else w.hidden=true;
+  if(!st.court){$('#pista').innerHTML=`<div class="empty">Sense alineació. La rotació es compta igualment, però sense saber qui és a pista.</div>`}
+  else{
+    $('#pista').innerHTML=[3,2,1,4,5,0].map(i=>{const n=st.court[i];
+      return `<button class="${sel.jug===n?'on':''} ${i===0&&st.serv==='nos'?'srv':''}" data-j="${n}" title="${esc(jname(n))}"><span class="pp">P${i+1}${i===0&&st.serv==='nos'?' · SERVEIX':''}</span><b class="num">${n}</b><small>${esc(first(n))}</small></button>`}).join('');
+  }
+  $('#subsInfo').textContent=st.court?`Set ${st.set} · ${st.subs}/6 canvis`:'';
+  $('#libInfo').textContent=st.court&&st.lib?`Lliure: ${st.lib} · ${jname(st.lib)}`:'';
+}
+function optList(list,selv){return '<option value="">—</option>'+list.map(j=>`<option value="${j.num}" ${selv===j.num?'selected':''}>${j.num} · ${esc(j.nom)}${j.pos?' ('+esc(j.pos)+')':''}</option>`).join('')}
+function openAlin(n){
+  const {st}=replay();n=n||st.set;
+  const box=$('#alinBox');ui.alin=true;box.hidden=false;$('#canviBox').hidden=true;ui.canvi=false;
+  if(!S.jug.length){box.innerHTML=`<span>Afegeix primer la plantilla a la pestanya <b>Partit</b>.</span><div class="row"><button class="btn" id="aCancel">Tanca</button></div>`;$('#aCancel').onclick=closeBoxes;return}
+  const a=S.alin[n]||{};
+  const pre=validAlin(a)?a.pos:(n===st.set&&st.court?st.court:(S.alin[n-1]&&validAlin(S.alin[n-1])?S.alin[n-1].pos:[]));
+  const roster=[...S.jug].sort((x,y)=>x.num-y.num);
+  box.innerHTML=`<div class="row" style="justify-content:space-between"><b>Alineació inicial</b>
+    <select class="inp" id="aSetN" aria-label="Set">${[1,2,3,4,5].map(k=>`<option value="${k}" ${k===n?'selected':''}>Set ${k}</option>`).join('')}</select></div>
+    <div class="note">Xarxa a dalt. P1 és qui serveix quan el saque és nostre.</div>
+    <div class="agrid">${[3,2,1,4,5,0].map(i=>`<label class="flabel">P${i+1}<select class="inp" id="aP${i}">${optList(roster,pre[i])}</select></label>`).join('')}</div>
+    <div class="agrid">
+      <label class="flabel">Lliure<select class="inp" id="aL">${optList(roster,a.lib||(S.alin[n-1]||{}).lib)}</select></label>
+      <label class="flabel">Serveix primer<select class="inp" id="aS"><option value="nos" ${a.serv!=='ells'?'selected':''}>${esc(S.meta.equip)}</option><option value="ells" ${a.serv==='ells'?'selected':''}>${esc(S.meta.rival)}</option></select></label>
+    </div>
+    <div class="row"><button class="btn pri" id="aSave">Desa l'alineació</button><button class="btn" id="aCancel">Tanca</button></div>`;
+  $('#aSetN').onchange=e=>openAlin(+e.target.value);
+  $('#aCancel').onclick=closeBoxes;
+  $('#aSave').onclick=()=>{
+    const pos=[0,1,2,3,4,5].map(i=>+$('#aP'+i).value||0);
+    if(!pos.every(Boolean))return toast('Omple les sis posicions');
+    if(new Set(pos).size!==6)return toast('Hi ha un dorsal repetit');
+    const lib=+$('#aL').value||null;if(lib&&pos.includes(lib))return toast('El lliure no pot ser a les sis posicions');
+    S.alin[n]={pos,lib,serv:$('#aS').value};S.meta.exemple=false;save();closeBoxes();render();toast(`Alineació del set ${n} desada`);
+  };
+}
+function openCanvi(){
+  const {st}=replay();
+  if(!st.court)return toast("Defineix primer l'alineació");
+  const box=$('#canviBox');ui.canvi=true;box.hidden=false;$('#alinBox').hidden=true;ui.alin=false;
+  const onC=st.court.map(n=>S.jug.find(j=>j.num===n)||{num:n,nom:'Dorsal '+n,pos:''});
+  const bench=S.jug.filter(j=>!st.court.includes(j.num)&&j.num!==st.lib).sort((x,y)=>x.num-y.num);
+  box.innerHTML=`<b>Canvi · set ${st.set}</b>
+    <div class="agrid"><label class="flabel">Surt<select class="inp" id="cvOut">${optList(onC,null)}</select></label>
+    <label class="flabel">Entra<select class="inp" id="cvIn">${optList(bench,null)}</select></label></div>
+    <div class="row"><button class="btn pri" id="cvDo">Fes el canvi</button><button class="btn" id="cvCancel">Tanca</button></div>`;
+  $('#cvCancel').onclick=closeBoxes;
+  $('#cvDo').onclick=()=>{const o=+$('#cvOut').value,i=+$('#cvIn').value;if(!o||!i)return toast('Tria qui surt i qui entra');
+    S.ev.push({id:S.nextId++,tipus:'canvi',t:Math.round(curTime()*10)/10,surt:o,entra:i});save();closeBoxes();render();
+    toast(st.subs>=6?`Canvi registrat · ja n'hi ha més de 6 en aquest set`:`Entra ${i} per ${o}`)};
+}
+function closeBoxes(){ui.alin=ui.canvi=false;$('#alinBox').hidden=true;$('#canviBox').hidden=true}
+$('#btnAlin').onclick=()=>ui.alin?closeBoxes():openAlin();
+$('#btnCanvi').onclick=()=>ui.canvi?closeBoxes():openCanvi();
+document.addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;
+  if(b.dataset.j){sel.jug=sel.jug===+b.dataset.j?null:+b.dataset.j;renderPicker()}
+  else if(b.dataset.f){sel.fon=sel.fon===b.dataset.f?null:b.dataset.f;if(sel.fon==='S'&&!sel.jug){const sv=autoServer();if(sv)sel.jug=sv}renderPicker()}
+  else if(b.dataset.z){const w=b.dataset.z,n=+b.dataset.n;sel[w]=sel[w]===n?null:n;renderPicker()}
+  else if(b.dataset.v){if(!sel.jug||!sel.fon)return toast('Tria primer jugador/a i fonament');addAcc(sel.jug,sel.fon,decodeURIComponent(b.dataset.v),sel.zi,sel.zf)}
+  else if(b.dataset.del){delEv(+b.dataset.del)}
+  else if(b.dataset.seek){const t=+b.dataset.seek;if(!seek(t)){window.open(ytLink(t),'_blank')||(clk.base=t,clk.start=Date.now())}}
+  else if(b.dataset.tab){tab=b.dataset.tab;renderView()}
+});
+
+/* ---------- Estadístiques ---------- */
+function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+const pct=(a,b)=>b?Math.round(a/b*100):null;
+const P=v=>v==null?'–':v+'%';
+function counts(list){const c={tot:list.length,'#':0,'+':0,'!':0,'-':0,'=':0};list.forEach(a=>c[a.val]++);c.eff=pct(c['#']-c['='],c.tot);c.pos=pct(c['#']+c['+'],c.tot);return c}
+function filtered(der){return fSet==='tots'?der:der.filter(e=>e.c.set===+fSet)}
+function jname(n){const j=S.jug.find(x=>x.num===n);return j?j.nom:'Dorsal '+n}
+
+const TABS=[['reg','Registre'],['fon','Fonaments'],['jug','Jugadors'],['rot','Rotacions i sets'],['zon','Zones'],['inf','Informe'],['cfg','Partit']];
+function renderView(){
+  $('#tabs').innerHTML=TABS.map(([k,l])=>`<button class="tab ${tab===k?'on':''}" data-tab="${k}">${l}</button>`).join('');
+  $('#filters').hidden=(tab==='cfg'||tab==='reg'||tab==='inf');
+  const {der,st}=replay();
+  const nSets=Math.max(1,st.set-(st.nos+st.ells===0&&st.set>1?1:0));
+  $('#fSet').innerHTML=`<option value="tots">Tots</option>`+Array.from({length:nSets},(_,i)=>`<option value="${i+1}" ${fSet==String(i+1)?'selected':''}>Set ${i+1}</option>`).join('');
+  $('#fSet').value=fSet;
+  const D=filtered(der),A=D.filter(e=>e.tipus==='acc'),PT=D.filter(e=>e.tipus==='punt');
+  const v=$('#view');
+  if(tab==='reg')v.innerHTML=viewReg(der);
+  else if(tab==='fon')v.innerHTML=viewFon(A,PT);
+  else if(tab==='jug')v.innerHTML=viewJug(A,PT);
+  else if(tab==='inf'){v.innerHTML=viewInf(der,st);bindInf(der,st)}
+  else if(tab==='rot')v.innerHTML=viewRot(PT,st);
+  else if(tab==='zon')v.innerHTML=viewZon(A);
+  else v.innerHTML=viewCfg();
+  if(tab==='zon')bindZon();
+  if(tab==='cfg')bindCfg();
+}
+$('#fSet').onchange=e=>{fSet=e.target.value;renderView()};
+
+function viewReg(der){
+  const rows=der.filter(e=>e.tipus!=='rot'&&e.tipus!=='serv').slice().reverse().slice(0,300);
+  if(!rows.length)return '<p class="muted">Encara no hi ha accions. Tria jugador/a, fonament i valoració, o escriu un codi ràpid com <b>7A#</b>.</p>';
+  return `<div class="log">`+rows.map(e=>{
+    const tl=mode==='yt'?`<button class="tlink" data-seek="${e.t}" title="Ves a aquest moment">${fmt(e.t)}</button>`
+      :S.meta.videoId?`<a class="tlink" href="${ytLink(e.t)}" target="_blank" rel="noopener" title="Obre a YouTube en aquest moment">${fmt(e.t)}</a>`
+      :`<span class="tlink" style="text-decoration:none;color:var(--muted)">${fmt(e.t)}</span>`;
+    const ctx=`S${e.c.set} · ${e.c.nos}-${e.c.ells} · R${e.c.rot}`;
+    if(e.tipus==='canvi')return `<div class="li pt">${tl}<span class="code">CANVI</span><span style="min-width:0">Entra ${e.entra} ${esc(first(e.entra))} · surt ${e.surt} ${esc(first(e.surt))}<br><span class="ctx">${ctx}</span></span><button class="del" data-del="${e.id}" aria-label="Esborra">×</button></div>`;
+    if(e.tipus==='punt'){const g=e.guanya==='nos';return `<div class="li pt">${tl}<span class="code" style="color:var(--${g?'good':'bad'})">${g?'+1 NOS':'+1 RIV'}</span><span><span class="ctx">${e.auto?'automàtic':'manual'} · ${ctx}</span></span>${e.auto?'<span></span>':`<button class="del" data-del="${e.id}" aria-label="Esborra">×</button>`}</div>`}
+    return `<div class="li">${tl}<span class="code">${e.jug}${e.fon}${e.val}${e.zi||''}${e.zf||''}</span><span style="min-width:0">${esc(jname(e.jug))} · ${FON[e.fon]} ${VDESC[e.val].toLowerCase()}<br><span class="ctx">${ctx}</span></span><button class="del" data-del="${e.id}" aria-label="Esborra">×</button></div>`;
+  }).join('')+`</div>`;
+}
+function viewFon(A,PT){
+  const won=PT.filter(p=>p.guanya==='nos').length,lost=PT.length-won;
+  const atk=counts(A.filter(a=>a.fon==='A')),srv=counts(A.filter(a=>a.fon==='S')),rec=counts(A.filter(a=>a.fon==='R'));
+  const k=`<div class="kpis">
+    <div class="kpi"><span class="label">Punts</span><b class="num">${won}–${lost}</b></div>
+    <div class="kpi"><span class="label">Eficàcia atac</span><b class="num">${P(atk.eff)}</b></div>
+    <div class="kpi"><span class="label">Recepció positiva</span><b class="num">${P(rec.pos)}</b></div>
+    <div class="kpi"><span class="label">Asos / errors servei</span><b class="num">${srv['#']} / ${srv['=']}</b></div></div>`;
+  const rows=Object.keys(FON).map(f=>{const c=counts(A.filter(a=>a.fon===f));
+    return `<tr><td>${FON[f]}</td><td>${c.tot}</td><td class="g">${c['#']}</td><td>${c['+']}</td><td>${c['!']}</td><td>${c['-']}</td><td class="b">${c['=']}</td><td>${P(c.pos)}</td><td>${P(c.eff)}${c.eff!=null&&c.eff>0?`<span class="bar" style="width:${Math.min(60,c.eff)}px"></span>`:''}</td></tr>`}).join('');
+  return k+`<div class="tbl-wrap" style="margin-top:12px"><table><thead><tr><th>Fonament</th><th>Tot</th><th>#</th><th>+</th><th>!</th><th>−</th><th>=</th><th>Pos.</th><th>Efic.</th></tr></thead><tbody>${rows}</tbody></table></div>
+  <p class="note">Positivitat = (# + +) / total. Eficàcia = (# − =) / total.</p>`;
+}
+function playerRows(A,PT){
+  const nums=[...new Set(A.map(a=>a.jug).concat(PT.flatMap(p=>p.c.court||[])))].sort((a,b)=>a-b);
+  return nums.map(n=>{const m=A.filter(a=>a.jug===n);const f=k=>counts(m.filter(a=>a.fon===k));
+    const s=f('S'),r=f('R'),a=f('A'),b=f('B'),d=f('D');
+    const on=PT.filter(p=>p.c.court&&p.c.court.includes(n));const ow=on.filter(p=>p.guanya==='nos').length;
+    return {n,s,r,a,b,d,pts:s['#']+a['#']+b['#'],err:m.filter(x=>x.val==='=').length,jug:on.length,pm:on.length?ow-(on.length-ow):null,tot:m.length};
+  }).filter(x=>x.tot||x.jug).sort((x,y)=>y.pts-x.pts||y.jug-x.jug);
+}
+function viewJug(A,PT){
+  const list=playerRows(A,PT);
+  if(!list.length)return '<p class="muted">Sense accions en aquest filtre.</p>';
+  const rows=list.map(({n,s,r,a,b,d,pts,err,jug,pm})=>{
+    return {n,pts,html:`<tr><td>${n} · ${esc(jname(n))}</td><td class="g">${pts}</td><td class="b">${err}</td><td>${jug||'–'}</td><td class="${pm>0?'g':pm<0?'b':''}">${pm==null?'–':(pm>0?'+':'')+pm}</td><td>${s.tot}</td><td>${s['#']}</td><td>${s['=']}</td><td>${r.tot}</td><td>${P(r.pos)}</td><td>${a.tot}</td><td>${a['#']}</td><td>${a['=']}</td><td>${P(a.eff)}</td><td>${b['#']}</td><td>${d.tot}</td><td>${P(d.pos)}</td></tr>`}});
+  return `<div class="tbl-wrap"><table><thead><tr><th>Jugador/a</th><th>Punts</th><th>Errors</th><th>Jugats</th><th>+/−</th><th>Serv.</th><th>As</th><th>Err.</th><th>Rec.</th><th>Rec+</th><th>Atac</th><th>Punt</th><th>Err.</th><th>Efic.</th><th>Bloq#</th><th>Def.</th><th>Def+</th></tr></thead><tbody>${rows.map(r=>r.html).join('')}</tbody></table></div>
+  <p class="note">Punts = asos + atacs punt + bloquejos punt. Jugats = punts disputats a pista (cal alineació). +/− = punts guanyats menys perduts amb el jugador/a a pista. Rec+ i Def+ = valoracions # i +.</p>`;
+}
+function viewRot(PT,st){
+  const rows=[1,6,5,4,3,2].map(r=>{const p=PT.filter(x=>x.c.rot===r);const w=p.filter(x=>x.guanya==='nos').length;
+    const rec=p.filter(x=>x.c.serv==='ells'),sv=p.filter(x=>x.c.serv==='nos');
+    const so=pct(rec.filter(x=>x.guanya==='nos').length,rec.length),br=pct(sv.filter(x=>x.guanya==='nos').length,sv.length);
+    const bal=w-(p.length-w);
+    return `<tr><td>R${r}</td><td class="g">${w}</td><td class="b">${p.length-w}</td><td class="${bal>0?'g':bal<0?'b':''}">${bal>0?'+':''}${bal}</td><td>${P(so)}</td><td>${P(br)}</td></tr>`}).join('');
+  const sets=st.sets.concat(st.nos+st.ells?[{set:st.set,nos:st.nos,ells:st.ells,cur:true}]:[]);
+  const setRows=sets.map(s=>`<tr><td>Set ${s.set}${s.cur?' (en joc)':''}</td><td class="${s.nos>s.ells?'g':''}">${s.nos}</td><td class="${s.ells>s.nos?'b':''}">${s.ells}</td></tr>`).join('');
+  return `<h3 style="font-size:18px;margin-bottom:6px">Per rotació</h3>
+  <div class="tbl-wrap"><table><thead><tr><th>Rotació</th><th>Guanyats</th><th>Perduts</th><th>Balanç</th><th>Side-out</th><th>Break</th></tr></thead><tbody>${rows}</tbody></table></div>
+  <p class="note">Side-out = punts guanyats quan serveix el rival. Break = punts guanyats amb el nostre servei. R1 = col·locador/a a zona 1.</p>
+  <h3 style="font-size:18px;margin:10px 0 6px">Parcials</h3>
+  <div class="tbl-wrap"><table><thead><tr><th>Set</th><th>${esc(S.meta.equip)}</th><th>${esc(S.meta.rival)}</th></tr></thead><tbody>${setRows||'<tr><td colspan="3">Encara no hi ha punts.</td></tr>'}</tbody></table></div>`;
+}
+function viewZon(A){
+  let list=A.filter(a=>a.fon===heatF&&(heatJ==='tots'||a.jug===+heatJ));
+  const key=heatMode;const withZ=list.filter(a=>a[key]);
+  const cnt={};ZLAY.forEach(z=>cnt[z]={n:0,k:0,e:0});
+  withZ.forEach(a=>{const c=cnt[a[key]];c.n++;if(a.val==='#')c.k++;if(a.val==='=')c.e++});
+  const max=Math.max(1,...ZLAY.map(z=>cnt[z].n));
+  const pos={4:[0,0,100,100],3:[100,0,100,100],2:[200,0,100,100],5:[0,100,100,200],6:[100,100,100,200],1:[200,100,100,200]};
+  const cells=ZLAY.map(z=>{const [x,y,w,h]=pos[z],c=cnt[z],p=Math.round(c.n/max*85);
+    return `<rect x="${x+10}" y="${y+10}" width="${w}" height="${h}" style="fill:color-mix(in srgb,var(--blue) ${p}%,var(--court))"/>
+    <text x="${x+10+w/2}" y="${y+10+h/2-4}" text-anchor="middle" style="fill:${p>45?'var(--blue-ink)':'var(--ink)'};font:700 26px var(--f-disp)">${c.n}</text>
+    <text x="${x+10+w/2}" y="${y+10+h/2+16}" text-anchor="middle" style="fill:${p>45?'var(--blue-ink)':'var(--muted)'};font:500 12px var(--f-body)">Z${z} · ${pct(c.n,withZ.length)??0}%</text>`}).join('');
+  const svg=`<svg viewBox="0 0 320 340" role="img" aria-label="Mapa de zones">
+    <rect x="10" y="10" width="300" height="300" style="fill:var(--court);stroke:var(--ink);stroke-width:2"/>${cells}
+    <line x1="10" y1="110" x2="310" y2="110" style="stroke:var(--ink);stroke-width:1.5;stroke-dasharray:6 4"/>
+    <line x1="4" y1="10" x2="316" y2="10" style="stroke:var(--ink);stroke-width:4"/>
+    <text x="160" y="332" text-anchor="middle" style="fill:var(--muted);font:500 12px var(--f-body)">Xarxa a dalt · línia de 3 m discontínua</text></svg>`;
+  const jugs=[...new Set(A.map(a=>a.jug))].sort((a,b)=>a-b);
+  const top=ZLAY.slice().sort((a,b)=>cnt[b].n-cnt[a].n).filter(z=>cnt[z].n).slice(0,3);
+  return `<div class="filters" style="margin-bottom:10px">
+    <select class="inp" id="hF">${Object.keys(FON).map(k=>`<option value="${k}" ${heatF===k?'selected':''}>${FON[k]}</option>`).join('')}</select>
+    <select class="inp" id="hJ"><option value="tots">Tot l'equip</option>${jugs.map(n=>`<option value="${n}" ${heatJ==String(n)?'selected':''}>${n} · ${esc(jname(n))}</option>`).join('')}</select>
+    <select class="inp" id="hM"><option value="zf" ${heatMode==='zf'?'selected':''}>Zona destí</option><option value="zi" ${heatMode==='zi'?'selected':''}>Zona origen</option></select></div>
+  <div class="court-wrap">${svg}<div class="legend">
+    <div><span class="label">Accions amb zona</span><div style="font:700 26px var(--f-disp)" class="num">${withZ.length} <span class="muted" style="font:400 14px var(--f-body)">de ${list.length}</span></div></div>
+    ${top.map(z=>`<div>Z${z}: <b class="num">${cnt[z].n}</b> accions · <span style="color:var(--good)">${cnt[z].k} #</span> · <span style="color:var(--bad)">${cnt[z].e} =</span></div>`).join('')||'<div class="muted">Sense zones registrades en aquest filtre.</div>'}
+    <div class="note">Zones estàndard: 4-3-2 a la xarxa, 5-6-1 al fons.</div></div></div>`;
+}
+function bindZon(){$('#hF').onchange=e=>{heatF=e.target.value;renderView()};$('#hJ').onchange=e=>{heatJ=e.target.value;renderView()};$('#hM').onchange=e=>{heatMode=e.target.value;renderView()}}
+
+/* ---------- Informe ---------- */
+function copyText(txt,ta,ok){const fb=()=>{ta.hidden=false;ta.focus();ta.select();toast('Selecciona i copia el text')};
+  try{navigator.clipboard.writeText(txt).then(()=>toast(ok)).catch(fb)}catch(e){fb()}}
+function rotRows(PT){return [1,6,5,4,3,2].map(r=>{const p=PT.filter(x=>x.c.rot===r);const w=p.filter(x=>x.guanya==='nos').length;return {r,w,l:p.length-w,bal:2*w-p.length}})}
+function summary(der,st){
+  const A=der.filter(e=>e.tipus==='acc'),PT=der.filter(e=>e.tipus==='punt');
+  const won=PT.filter(p=>p.guanya==='nos').length;
+  const c=k=>counts(A.filter(a=>a.fon===k));
+  const atk=c('A'),srv=c('S'),rec=c('R'),blk=c('B');
+  const rec_=PT.filter(p=>p.c.serv==='ells'),sv_=PT.filter(p=>p.c.serv==='nos');
+  const so=pct(rec_.filter(p=>p.guanya==='nos').length,rec_.length),br=pct(sv_.filter(p=>p.guanya==='nos').length,sv_.length);
+  const players=playerRows(A,PT);
+  const rots=rotRows(PT).filter(x=>x.w+x.l);
+  const sets=st.sets.concat(st.nos+st.ells?[{set:st.set,nos:st.nos,ells:st.ells,cur:true}]:[]);
+  const errs=A.filter(a=>a.val==='='&&'SABE'.includes(a.fon));
+  const errBy=k=>errs.filter(a=>a.fon===k).length;
+  const ins=[];
+  const done=st.wn===3||st.we===3;
+  ins.push(done?`${st.wn>st.we?'Victòria':'Derrota'} per ${st.wn}–${st.we}.`:`Partit en joc: ${st.wn}–${st.we} en sets${st.nos+st.ells?`, ${st.nos}–${st.ells} al set ${st.set}`:''}.`);
+  const top=players[0];if(top&&top.pts)ins.push(`Màxim anotador/a: ${jname(top.n)} amb ${top.pts} punts (${top.a['#']} d'atac, ${top.b['#']} de bloqueig, ${top.s['#']} de servei).`);
+  const atkers=players.filter(p=>p.a.tot>=8).sort((x,y)=>y.a.eff-x.a.eff);
+  if(atkers.length)ins.push(`Atacant més eficaç: ${jname(atkers[0].n)}, ${atkers[0].a.eff}% d'eficàcia en ${atkers[0].a.tot} atacs.`);
+  if(rots.length>1){const s=rots.slice().sort((x,y)=>y.bal-x.bal);const b=s[0],w=s[s.length-1];
+    ins.push(`Millor rotació: R${b.r} (${b.bal>0?'+':''}${b.bal}). Pitjor rotació: R${w.r} (${w.bal>0?'+':''}${w.bal}).`)}
+  if(so!=null||br!=null)ins.push(`Side-out del ${P(so)} i break del ${P(br)}.`);
+  if(errs.length)ins.push(`${errs.length} punts cedits per errors propis: ${errBy('S')} de servei, ${errBy('A')} d'atac, ${errBy('B')} de bloqueig i ${errBy('E')} de col·locació.${rec['=']?` A més, ${rec['=']} asos rebuts.`:''}`);
+  if(rec.tot)ins.push(`Recepció positiva del ${P(rec.pos)} (${rec['#']} perfectes de ${rec.tot}).`);
+  return {A,PT,won,lost:PT.length-won,atk,srv,rec,blk,so,br,players,rots,sets,ins};
+}
+function viewInf(der,st){
+  const s=summary(der,st);
+  if(!s.PT.length&&!s.A.length)return '<p class="muted">Registra accions i punts per generar l\'informe.</p>';
+  const pr=s.players.slice(0,8).map(p=>`<tr><td>${p.n} · ${esc(jname(p.n))}</td><td class="g">${p.pts}</td><td>${p.a.tot?P(p.a.eff):'–'}</td><td>${p.r.tot?P(p.r.pos):'–'}</td><td>${p.s['#']}/${p.s['=']}</td><td class="${p.pm>0?'g':p.pm<0?'b':''}">${p.pm==null?'–':(p.pm>0?'+':'')+p.pm}</td></tr>`).join('');
+  return `<div class="rep-head"><span class="res num">${st.wn}–${st.we}</span><span class="muted num">${s.sets.map(x=>`${x.nos}-${x.ells}${x.cur?'*':''}`).join(' · ')}</span></div>
+  <div class="kpis" style="margin:10px 0">
+    <div class="kpi"><span class="label">Punts</span><b class="num">${s.won}–${s.lost}</b></div>
+    <div class="kpi"><span class="label">Eficàcia atac</span><b class="num">${P(s.atk.eff)}</b></div>
+    <div class="kpi"><span class="label">Side-out</span><b class="num">${P(s.so)}</b></div>
+    <div class="kpi"><span class="label">Break</span><b class="num">${P(s.br)}</b></div></div>
+  <h3 style="font-size:18px;margin-bottom:6px">Claus del partit</h3>
+  <ul class="insights">${s.ins.map(i=>`<li>${esc(i)}</li>`).join('')}</ul>
+  <h3 style="font-size:18px;margin:14px 0 6px">Jugadors destacats</h3>
+  <div class="tbl-wrap"><table><thead><tr><th>Jugador/a</th><th>Punts</th><th>Efic. atac</th><th>Rec+</th><th>As/Err</th><th>+/−</th></tr></thead><tbody>${pr}</tbody></table></div>
+  <div class="row" style="margin-top:14px">
+    <button class="btn pri" id="iCopy">Copia el resum</button>
+    <button class="btn" id="iDown">Descarrega l'informe (HTML)</button>
+  </div>
+  <p class="note">El resum en text va bé per enviar per correu o missatgeria. L'informe HTML s'obre en qualsevol navegador i es pot imprimir o desar com a PDF des d'allà.</p>
+  <textarea class="inp" id="iTxt" readonly hidden></textarea>`;
+}
+function reportText(der,st){
+  const s=summary(der,st);
+  return [`${S.meta.equip} – ${S.meta.rival} · ${S.meta.data||''}`,`Resultat: ${st.wn}–${st.we} (${s.sets.map(x=>`${x.nos}-${x.ells}${x.cur?'*':''}`).join(', ')})`,'',
+    ...s.ins.map(i=>'• '+i),'','Jugadors (punts · efic. atac · rec+ · +/−):',
+    ...s.players.slice(0,8).map(p=>`${p.n} ${jname(p.n)}: ${p.pts} · ${p.a.tot?P(p.a.eff):'–'} · ${p.r.tot?P(p.r.pos):'–'} · ${p.pm==null?'–':(p.pm>0?'+':'')+p.pm}`)].join('\n');
+}
+function reportHTML(der,st){
+  const s=summary(der,st);const e=esc;
+  const td='padding:6px 10px;border-bottom:1px solid #dde3ec;text-align:right;font-variant-numeric:tabular-nums';
+  const th=td+';font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:#5a6779;background:#f2f5f9';
+  const tbl=(h,rows)=>`<table style="border-collapse:collapse;width:100%;margin:6px 0 18px"><tr>${h.map((x,i)=>`<th style="${th}${i?'':';text-align:left'}">${x}</th>`).join('')}</tr>${rows.map(r=>`<tr>${r.map((x,i)=>`<td style="${td}${i?'':';text-align:left'}">${x}</td>`).join('')}</tr>`).join('')}</table>`;
+  const fon=Object.keys(FON).map(f=>{const c=counts(s.A.filter(a=>a.fon===f));return [FON[f],c.tot,c['#'],c['+'],c['!'],c['-'],c['='],P(c.pos),P(c.eff)]});
+  const pl=s.players.map(p=>[`${p.n} · ${e(jname(p.n))}`,p.pts,p.err,p.jug||'–',p.pm==null?'–':(p.pm>0?'+':'')+p.pm,`${p.s.tot} (${p.s['#']}/${p.s['=']})`,p.r.tot?`${p.r.tot} (${P(p.r.pos)})`:'–',p.a.tot?`${p.a.tot} (${P(p.a.eff)})`:'–',p.b['#']]);
+  const rt=rotRows(s.PT).map(r=>['R'+r.r,r.w,r.l,(r.bal>0?'+':'')+r.bal]);
+  return `<!doctype html><html lang="ca"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Informe ${e(S.meta.equip)} – ${e(S.meta.rival)}</title></head>
+<body style="margin:0;background:#fff;color:#132033;font-family:Barlow,system-ui,-apple-system,'Segoe UI',sans-serif;font-size:15px;line-height:1.45">
+<div style="max-width:860px;margin:0 auto;padding:28px 18px">
+<div style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#5a6779">Informe de partit · ${e(S.meta.data||'')}</div>
+<h1 style="margin:4px 0 2px;font-size:30px">${e(S.meta.equip)} – ${e(S.meta.rival)}</h1>
+<div style="font-size:40px;font-weight:700;color:#1F4E8C">${st.wn}–${st.we}</div>
+<div style="color:#5a6779;margin-bottom:18px">${s.sets.map(x=>`Set ${x.set}: ${x.nos}-${x.ells}${x.cur?' (en joc)':''}`).join(' · ')}</div>
+<h2 style="font-size:20px;margin:0 0 6px">Claus del partit</h2>
+<ul style="margin:0 0 18px;padding-left:20px">${s.ins.map(i=>`<li style="margin-bottom:4px">${e(i)}</li>`).join('')}</ul>
+<h2 style="font-size:20px;margin:0">Per fonament</h2>${tbl(['Fonament','Tot','#','+','!','−','=','Pos.','Efic.'],fon)}
+<h2 style="font-size:20px;margin:0">Per jugador/a</h2>${tbl(['Jugador/a','Punts','Errors','Jugats','+/−','Servei (as/err)','Recepció (pos.)','Atac (efic.)','Bloq #'],pl)}
+<h2 style="font-size:20px;margin:0">Per rotació</h2>${tbl(['Rotació','Guanyats','Perduts','Balanç'],rt)}
+<p style="color:#5a6779;font-size:13px">Positivitat = (# + +) / total. Eficàcia = (# − =) / total. Side-out ${P(s.so)} · Break ${P(s.br)}. Generat amb Sports VidIA.</p>
+</div></body></html>`;
+}
+async function offerFile(name,data){
+  if(window.claude&&window.claude.use){
+    const dl=await window.claude.use('downloads');
+    if(dl){try{await dl.save({filename:name,data});toast('Fitxer desat')}catch(err){if(err&&err.code!=='declined')toast('Descàrrega no disponible en aquesta vista')}return}
+  }
+  try{const ext=name.split('.').pop();const b=new Blob([data],{type:ext==='csv'?'text/csv':'text/html'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();a.remove()}catch(e){toast('Descàrrega no disponible en aquesta vista')}
+}
+function bindInf(der,st){
+  const iCopy=$('#iCopy');if(!iCopy)return;
+  iCopy.onclick=()=>{const txt=reportText(der,st),ta=$('#iTxt');ta.value=txt;
+    copyText(txt,ta,'Resum copiat')};
+  $('#iDown').onclick=()=>offerFile('informe_'+(S.meta.nom||'partit').replace(/[^\w\-]+/g,'_')+'.html',reportHTML(der,st));
+}
+
+/* ---------- Configuració i CSV ---------- */
+function toCSV(){
+  const {der}=replay();const h=['id','tipus','temps_s','set','marcador_nos','marcador_rival','rotacio','serveix','dorsal','jugador','fonament','valoracio','zona_origen','zona_desti','guanya','automatic','de_accio','rot_nova','serv_nou','surt','entra','detall'];
+  const q=v=>{v=v==null?'':String(v);return /[",\n;]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
+  const blank=n=>Array(n).fill('');
+  const jr=S.jug.map(j=>['','jugador','','','','','','',j.num,j.nom,...blank(11),j.pos||'']);
+  const ar=Object.keys(S.alin).filter(k=>validAlin(S.alin[k])).map(k=>{const a=S.alin[k];return ['','alineacio','',k,'','','','',...blank(13),`${a.pos.join('-')}|${a.lib||''}|${a.serv||''}`]});
+  const er=der.map(e=>[e.id,e.tipus,e.t,e.c.set,e.c.nos,e.c.ells,e.c.rot,e.c.serv,e.jug,e.jug!=null?jname(e.jug):'',e.fon,e.val,e.zi,e.zf,e.guanya,e.tipus==='punt'?(e.auto?1:0):'',e.of,e.tipus==='rot'?(e.d||e.rot):'',e.serv,e.surt,e.entra,e.c.court?e.c.court.join('-'):'']);
+  return [h].concat(jr,ar,er).map(r=>r.map(q).join(',')).join('\n');
+}
+function fromCSV(txt){
+  const lines=txt.replace(/^﻿/,'').replace(/\r/g,'').split('\n').filter(Boolean);const h=splitCSV(lines.shift());const ix=k=>h.indexOf(k);
+  if(ix('tipus')<0)throw new Error('format');
+  const ev=[];let max=0;const alin={};const jug=[];
+  lines.forEach(l=>{const c=splitCSV(l);const g=k=>c[ix(k)]||'';const tp=g('tipus');
+    if(tp==='jugador'){jug.push({num:+g('dorsal'),nom:g('jugador'),pos:g('detall')});return}
+    if(tp==='alineacio'){const [p,lb,sv]=g('detall').split('|');alin[+g('set')]={pos:p.split('-').map(Number),lib:+lb||null,serv:sv||'nos'};return}
+    const id=+g('id');max=Math.max(max,id);
+    const e={id,tipus:tp,t:+g('temps_s')||0};
+    if(tp==='canvi'){e.surt=+g('surt');e.entra=+g('entra')}
+    if(tp==='acc'){e.jug=+g('dorsal');e.fon=g('fonament');e.val=g('valoracio');e.zi=+g('zona_origen')||null;e.zf=+g('zona_desti')||null;
+      if(!S.jug.find(j=>j.num===e.jug))S.jug.push({num:e.jug,nom:g('jugador')||'Dorsal '+e.jug,pos:''})}
+    else if(tp==='punt'){e.guanya=g('guanya');e.auto=g('automatic')==='1';e.of=+g('de_accio')||null}
+    else if(tp==='rot'){const v=+g('rot_nova');if(v===1||v===-1)e.d=v;else e.rot=v}
+    else if(tp==='serv')e.serv=g('serv_nou');
+    ev.push(e)});
+  if(jug.length)jug.forEach(j=>{const x=S.jug.find(y=>y.num===j.num);if(x){x.nom=j.nom;x.pos=j.pos}else S.jug.push(j)});
+  if(Object.keys(alin).length)S.alin=alin;
+  return {ev,next:max+1};
+}
+function splitCSV(l){const o=[];let cur='',q=false;for(let i=0;i<l.length;i++){const ch=l[i];if(q){if(ch==='"'&&l[i+1]==='"'){cur+='"';i++}else if(ch==='"')q=false;else cur+=ch}else if(ch==='"')q=true;else if(ch===','){o.push(cur);cur=''}else cur+=ch}o.push(cur);return o}
+function viewCfg(){
+  const roster=[...S.jug].sort((a,b)=>a.num-b.num).map(j=>`${j.num} ${j.nom}${j.pos?' | '+j.pos:''}`).join('\n');
+  return `<div class="cfg">
+    <label>Nom del partit<input class="inp" id="cNom" value="${esc(S.meta.nom)}"></label>
+    <label>Data<input class="inp" id="cData" type="date" value="${esc(S.meta.data)}"></label>
+    <label>El nostre equip<input class="inp" id="cEq" value="${esc(S.meta.equip)}"></label>
+    <label>Rival<input class="inp" id="cRiv" value="${esc(S.meta.rival)}"></label>
+  </div>
+  <label style="display:grid;gap:4px;font-size:13px;color:var(--muted);font-weight:600;margin-top:10px">Enllaç de YouTube<input class="inp" id="cUrl" placeholder="https://www.youtube.com/watch?v=…" value="${esc(S.meta.url)}"></label>
+  <div class="cfg" style="margin-top:10px">
+    <label>Rotació inicial<select class="inp" id="cRot">${[1,2,3,4,5,6].map(r=>`<option ${S.cfg.rot0===r?'selected':''} value="${r}">R${r}</option>`).join('')}</select></label>
+    <label>Primer servei<select class="inp" id="cServ"><option value="nos" ${S.cfg.serv0==='nos'?'selected':''}>Nosaltres</option><option value="ells" ${S.cfg.serv0==='ells'?'selected':''}>Rival</option></select></label>
+  </div>
+  <label style="display:grid;gap:4px;font-size:13px;color:var(--muted);font-weight:600;margin-top:10px">Plantilla (una línia per jugador/a: dorsal nom | posició)
+  <textarea class="inp" id="cRoster" placeholder="1 Pol Serra | Col">${esc(roster)}</textarea></label>
+  <div class="row" style="margin-top:10px"><button class="btn pri" id="cSave">Desa canvis</button></div>
+  <h3 style="font-size:18px;margin:18px 0 6px">Dades</h3>
+  <div class="row">
+    <button class="btn" id="cCopy">Copia CSV</button>
+    <button class="btn" id="cDown">Descarrega CSV</button>
+    <label class="btn" style="cursor:pointer">Importa CSV<input type="file" id="cImp" accept=".csv,text/csv" hidden></label>
+  </div>
+  <p class="note">Les dades es guarden només en aquest navegador. Exporta el CSV en acabar cada partit. Si la descàrrega no funciona en aquesta vista, fes servir Copia CSV i enganxa-ho en un full de càlcul.</p>
+  <textarea class="inp" id="cCsv" readonly hidden></textarea>
+  <div class="row" style="margin-top:6px">
+    <button class="btn bad" id="cNew">Partit nou (buida tot)</button>
+    <button class="btn" id="cEx">Carrega l'exemple</button>
+  </div>
+  <div class="row" id="cConfirm" hidden><span class="note" id="cConfirmTxt"></span><button class="btn bad" id="cYes">Sí, continua</button><button class="btn" id="cNo">Cancel·la</button></div>`;
+}
+function bindCfg(){
+  $('#cSave').onclick=()=>{
+    S.meta.nom=$('#cNom').value.trim()||'Partit';S.meta.data=$('#cData').value;S.meta.equip=$('#cEq').value.trim()||'Nosaltres';S.meta.rival=$('#cRiv').value.trim()||'Rival';
+    const url=$('#cUrl').value.trim();const id=ytId(url);if(url&&!id)return toast("No reconec l'enllaç de YouTube");
+    const changed=id!==S.meta.videoId;S.meta.url=url;S.meta.videoId=id;
+    S.cfg.rot0=+$('#cRot').value;S.cfg.serv0=$('#cServ').value;
+    S.jug=$('#cRoster').value.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{const m=l.match(/^(\d{1,2})\s+([^|]+?)\s*(?:\|\s*(.+))?$/);return m?{num:+m[1],nom:m[2].trim(),pos:(m[3]||'').trim()}:null}).filter(Boolean);
+    save();if(changed){ytReady?makePlayer():setMode('clock')}render();toast('Desat');
+  };
+  $('#cCopy').onclick=()=>{const csv=toCSV(),ta=$('#cCsv');ta.value=csv;
+    copyText(csv,ta,'CSV copiat')};
+  $('#cDown').onclick=()=>offerFile((S.meta.nom||'partit').replace(/[^\w\-]+/g,'_')+'.csv','﻿'+toCSV());
+  $('#cImp').onchange=e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{try{const r=fromCSV(rd.result);S.ev=r.ev;S.nextId=r.next;S.meta.exemple=false;save();render();toast(r.ev.length+' esdeveniments importats')}catch(x){toast('El fitxer no té el format esperat')}};rd.readAsText(f)};
+  let pending=null;
+  const ask=(txt,fn)=>{pending=fn;$('#cConfirmTxt').textContent=txt;$('#cConfirm').hidden=false};
+  $('#cNew').onclick=()=>ask('Es perdran totes les accions i la plantilla.',()=>{S=empty();});
+  $('#cEx').onclick=()=>ask("Se substituirà el partit actual per l'exemple.",()=>{S=sample();});
+  $('#cYes').onclick=()=>{if(pending)pending();pending=null;save();sel={jug:null,fon:null,zi:null,zf:null};ytReady?makePlayer():setMode('clock');render()};
+  $('#cNo').onclick=()=>{pending=null;$('#cConfirm').hidden=true};
+}
+
+/* ---------- Render ---------- */
+function render(){
+  const {st}=replay();
+  $('#mTitle').innerHTML=esc(S.meta.nom)+(S.meta.exemple?'<span class="badge">Exemple</span>':'');
+  $('#mSub').textContent=[S.meta.data,S.ev.filter(e=>e.tipus==='acc').length+' accions registrades'].filter(Boolean).join(' · ');
+  $('#nNos').textContent=S.meta.equip;$('#nElls').textContent=S.meta.rival;
+  $('#sNos').textContent=st.nos;$('#sElls').textContent=st.ells;$('#sSet').textContent=st.set;
+  $('#wNos').textContent=st.wn;$('#wElls').textContent=st.we;$('#sRot').textContent='R'+st.rot;
+  $('#dNos').classList.toggle('on',st.serv==='nos');$('#dElls').classList.toggle('on',st.serv==='ells');
+  renderPicker();renderView();
+}
+booted=true;render();
+})();
+</script>
+
+<script>
+(function(){
+  if('serviceWorker' in navigator && /^https?:$/.test(location.protocol)){
+    window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+  }
+  let deferred=null;const btn=document.getElementById('installBtn');
+  window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferred=e;btn.hidden=false});
+  btn.addEventListener('click',async()=>{if(!deferred)return;deferred.prompt();try{await deferred.userChoice}catch(e){}deferred=null;btn.hidden=true});
+  window.addEventListener('appinstalled',()=>{btn.hidden=true});
+  const off=document.getElementById('offBadge');const upd=()=>{off.hidden=navigator.onLine};
+  window.addEventListener('online',upd);window.addEventListener('offline',upd);upd();
+})();
+</script>
+</body>
+</html>

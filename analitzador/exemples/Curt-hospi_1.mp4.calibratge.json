@@ -1,1 +1,36 @@
-{"cantonades":[[0.0977,0.8861],[0.8695,0.8278],[0.5508,0.3639],[0.2641,0.3556]]}
+{
+ "cantonades": [
+  [
+   0.0977,
+   0.8861
+  ],
+  [
+   0.8695,
+   0.8278
+  ],
+  [
+   0.5508,
+   0.3639
+  ],
+  [
+   0.2641,
+   0.3542
+  ]
+ ],
+ "punts_mig": [
+  [
+   0.3438,
+   0.9056
+  ],
+  [
+   0.7266,
+   0.5972
+  ],
+  [
+   0.1812,
+   0.6111
+  ]
+ ],
+ "lent_k": -0.2475,
+ "ordre": "propera esquerra, propera dreta, llunyana dreta, llunyana esquerra; mig fons proper, mig banda dreta, mig banda esquerra"
+}

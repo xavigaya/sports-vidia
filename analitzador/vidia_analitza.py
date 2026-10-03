@@ -72,8 +72,74 @@ def video_info(path):
 
 
 # ---------------------------------------------------------------- calibratge
+# Model de lent (ull de peix): model de divisió amb un coeficient radial k.
+# q = (p - centre) / mig_diagonal ;  q_recte = q / (1 + k·|q|²)
+def _norm(p, W, H):
+    c = np.array([W / 2, H / 2]); s = np.hypot(W / 2, H / 2)
+    return (np.asarray(p, float) - c) / s, c, s
+
+
+def lens_undistort(p, k, W, H):
+    q, c, s = _norm(p, W, H)
+    r2 = (q ** 2).sum(-1, keepdims=True)
+    return q / (1 + k * r2) * s + c
+
+
+def lens_distort(u, k, W, H):
+    q, c, s = _norm(u, W, H)
+    ru = np.sqrt((q ** 2).sum(-1, keepdims=True))
+    if abs(k) < 1e-9:
+        return np.asarray(u, float)
+    disc = np.clip(1 - 4 * k * ru ** 2, 0, None)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        rd = np.where(ru > 1e-9, (1 - np.sqrt(disc)) / (2 * k * ru), 0)
+        f = np.where(ru > 1e-9, rd / ru, 1)
+    return q * f * s + c
+
+
+def fit_lens(lines, W, H):
+    """lines: llistes de punts (píxels) que haurien d'estar en una recta. Retorna k."""
+    from scipy.optimize import minimize_scalar
+    lines = [np.asarray(l, float) for l in lines if len(l) >= 3]
+    if not lines:
+        return 0.0, None
+
+    def res(k):
+        tot, n = 0.0, 0
+        for l in lines:
+            u = lens_undistort(l, k, W, H)
+            d = u - u.mean(0)
+            _, sv, _ = np.linalg.svd(d, full_matrices=False)
+            tot += sv[-1] ** 2; n += len(l)
+        return tot / max(n, 1)
+
+    o = minimize_scalar(res, bounds=(-0.8, 0.8), method="bounded")
+    return float(o.x), float(np.sqrt(o.fun))
+
+
+def trace_line(gray, a, b, k_guess=0.0, search=40):
+    """Busca la línia fosca de la pista entre a i b (píxels) i en retorna punts."""
+    H, W = gray.shape
+    pts = []
+    n = int(np.hypot(*(np.subtract(b, a))) / 25)
+    for i in range(1, n):
+        t = i / n
+        x, y = (1 - t) * np.array(a) + t * np.array(b)
+        xi = int(round(x))
+        if not (3 <= xi < W - 3):
+            continue
+        ys = np.arange(max(0, int(y - search)), min(H, int(y + search)))
+        if ys.size < 5:
+            continue
+        col = gray[ys, xi - 2:xi + 3].mean(1)
+        j = int(col.argmin())
+        if col[j] < np.median(col) * 0.6:      # cal un contrast clar
+            pts.append((x, ys[j]))
+    return pts
+
+
 def calibra(video, t=None):
-    """Mostra una imatge del vídeo i demana clicar les 4 cantonades de la pista."""
+    """Demana clicar les 4 cantonades i el punt mig de tres línies, i calcula la deformació de la lent."""
     import cv2
     info = video_info(video)
     cap = cv2.VideoCapture(str(video))
@@ -83,7 +149,9 @@ def calibra(video, t=None):
     if not ok:
         sys.exit("No he pogut llegir cap imatge del vídeo.")
     noms = ["1 Cantonada PROPERA esquerra", "2 Cantonada PROPERA dreta",
-            "3 Cantonada LLUNYANA dreta", "4 Cantonada LLUNYANA esquerra"]
+            "3 Cantonada LLUNYANA dreta", "4 Cantonada LLUNYANA esquerra",
+            "5 Punt MIG de la linia de fons PROPERA", "6 Punt MIG de la banda DRETA",
+            "7 Punt MIG de la banda ESQUERRA"]
     escala = min(1.0, 1280 / frame.shape[1])
     img = cv2.resize(frame, None, fx=escala, fy=escala)
     punts = []
@@ -93,49 +161,98 @@ def calibra(video, t=None):
         for i, p in enumerate(punts):
             cv2.circle(v, p, 6, (0, 255, 255), -1)
             cv2.putText(v, str(i + 1), (p[0] + 8, p[1] - 8), 0, .7, (0, 255, 255), 2)
-        if len(punts) > 1:
-            cv2.polylines(v, [np.array(punts)], len(punts) == 4, (0, 255, 255), 2)
-        txt = noms[len(punts)] if len(punts) < 4 else "Fet: prem S per desar, R per tornar a començar"
+        if len(punts) >= 2:
+            cv2.polylines(v, [np.array(punts[:4])], len(punts) >= 4, (0, 255, 255), 1)
+        txt = noms[len(punts)] if len(punts) < 7 else "Fet: S desa, R torna a començar"
+        if 4 <= len(punts) < 7:
+            txt += "  (X: desa sense corregir la lent)"
         cv2.rectangle(v, (0, 0), (v.shape[1], 34), (0, 0, 0), -1)
-        cv2.putText(v, txt, (10, 24), 0, .7, (255, 255, 255), 2)
+        cv2.putText(v, txt, (10, 24), 0, .65, (255, 255, 255), 2)
         cv2.imshow("Calibratge Sports VidIA", v)
 
     def clic(ev, x, y, *_):
-        if ev == cv2.EVENT_LBUTTONDOWN and len(punts) < 4:
-            punts.append((x, y))
-            redibuixa()
+        if ev == cv2.EVENT_LBUTTONDOWN and len(punts) < 7:
+            punts.append((x, y)); redibuixa()
 
     cv2.namedWindow("Calibratge Sports VidIA")
     cv2.setMouseCallback("Calibratge Sports VidIA", clic)
     redibuixa()
     while True:
-        k = cv2.waitKey(50) & 0xFF
-        if k in (ord("r"), ord("R")):
+        key = cv2.waitKey(50) & 0xFF
+        if key in (ord("r"), ord("R")):
             punts.clear(); redibuixa()
-        if k in (ord("s"), ord("S")) and len(punts) == 4:
+        if key in (ord("s"), ord("S")) and len(punts) == 7:
             break
-        if k == 27:
+        if key in (ord("x"), ord("X")) and len(punts) >= 4:
+            punts[:] = punts[:4]; break
+        if key == 27:
             cv2.destroyAllWindows(); sys.exit("Calibratge cancel·lat.")
     cv2.destroyAllWindows()
     h, w = img.shape[:2]
-    cal = {"cantonades": [[round(x / w, 4), round(y / h, 4)] for x, y in punts],
-           "ordre": "propera esquerra, propera dreta, llunyana dreta, llunyana esquerra"}
+    cal = calibratge_de_punts(punts, w, h, cv2.cvtColor(img, cv2.COLOR_BGR2GRAY))
     out = Path(str(video) + ".calibratge.json")
     out.write_text(json.dumps(cal, indent=2, ensure_ascii=False), encoding="utf-8")
-    print(f"Calibratge desat a {out}")
+    prev = Path(str(video) + ".calibratge.jpg")
+    cv2.imwrite(str(prev), dibuixa_calibratge(img, cal))
+    print(f"Calibratge desat a {out.name}. Lent: k = {cal['lent_k']:.3f}.")
+    print(f"Comprova la imatge {prev.name}: les línies grogues han de seguir les de la pista.")
     return cal
 
 
+def calibratge_de_punts(punts, w, h, gray=None):
+    """Construeix el calibratge (coordenades normalitzades i coeficient de lent)."""
+    P = [np.array(p, float) for p in punts]
+    k, err = 0.0, None
+    if len(P) >= 7:
+        NL, NR, FR, FL, MN, MR, ML = P[:7]
+        lines = [[NL, MN, NR], [NR, MR, FR], [NL, ML, FL]]
+        if gray is not None:      # afegim punts de la línia de fons propera, traçats automàticament
+            tr = trace_line(gray, NL, MN) + trace_line(gray, MN, NR)
+            if len(tr) >= 8:
+                k0, e0 = fit_lens([tr], w, h)
+                if e0 is not None and e0 < 0.004 * np.hypot(w, h):
+                    lines[0] = [NL] + tr + [NR]
+        k, err = fit_lens(lines, w, h)
+    return {"cantonades": [[round(x / w, 4), round(y / h, 4)] for x, y in punts[:4]],
+            "punts_mig": [[round(x / w, 4), round(y / h, 4)] for x, y in punts[4:7]],
+            "lent_k": round(k, 4),
+            "ordre": "propera esquerra, propera dreta, llunyana dreta, llunyana esquerra; mig fons proper, mig banda dreta, mig banda esquerra"}
+
+
+def _poly_dist(poly_u, k, W, H, per_edge=40):
+    """Densifica un polígon recte (espai corregit) i el torna a l'espai de la imatge."""
+    pts = []
+    n = len(poly_u)
+    for i in range(n):
+        a, b = poly_u[i], poly_u[(i + 1) % n]
+        for t in np.linspace(0, 1, per_edge, endpoint=False):
+            pts.append((1 - t) * a + t * b)
+    return lens_distort(np.array(pts), k, W, H)
+
+
 def zones(cal, W, H):
-    """Polígons (en píxels de l'anàlisi) de la pista i de les zones de servei."""
-    c = np.array(cal["cantonades"], dtype=np.float32) * [W, H]
-    NL, NR, FR, FL = c
+    """Polígons (en píxels de l'anàlisi) de la pista i de les zones de servei, seguint la corba de la lent."""
+    k = float(cal.get("lent_k", 0) or 0)
+    c = np.array(cal["cantonades"], dtype=float) * [W, H]
+    NL, NR, FR, FL = lens_undistort(c, k, W, H)
     pista = np.array([NL, NR, FR, FL])
-    # zona darrere la línia propera: allarguem les bandes cap a la càmera
     prop = np.array([NL, NR, NR + (NR - FR) * 0.45, NL + (NL - FL) * 0.45])
-    # zona darrere la línia llunyana: allarguem cap a la paret del fons
     lluny = np.array([FL, FR, FR + (FR - NR) * 0.18, FL + (FL - NL) * 0.18])
-    return pista, prop, lluny
+    return tuple(_poly_dist(p, k, W, H) for p in (pista, prop, lluny))
+
+
+def dibuixa_calibratge(img, cal):
+    import cv2
+    h, w = img.shape[:2]
+    v = img.copy()
+    pista, prop, lluny = zones(cal, w, h)
+    over = v.copy()
+    cv2.fillPoly(over, [np.round(prop).astype(np.int32)], (0, 200, 0))
+    v = cv2.addWeighted(over, 0.25, v, 0.75, 0)
+    cv2.polylines(v, [np.round(pista).astype(np.int32)], True, (0, 255, 255), 2)
+    cv2.polylines(v, [np.round(prop).astype(np.int32)], True, (0, 200, 0), 2)
+    cv2.putText(v, f"Zona de servei propera (verd) - lent k={cal.get('lent_k', 0):.3f}", (10, 28), 0, .7, (255, 255, 255), 2)
+    return v
 
 
 def mask_of(poly, W, H):

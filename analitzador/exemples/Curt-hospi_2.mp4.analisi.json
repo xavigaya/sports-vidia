@@ -18,14 +18,30 @@
     0.7681
    ],
    [
-    0.5859,
-    0.3819
+    0.5875,
+    0.375
    ],
    [
     0.3594,
-    0.375
+    0.3722
    ]
-  ]
+  ],
+  "punts_mig": [
+   [
+    0.5391,
+    0.8417
+   ],
+   [
+    0.75,
+    0.5972
+   ],
+   [
+    0.2906,
+    0.5972
+   ]
+  ],
+  "lent_k": -0.3449,
+  "ordre": "propera esquerra, propera dreta, llunyana dreta, llunyana esquerra; mig fons proper, mig banda dreta, mig banda esquerra"
  },
  "parametres": {
   "xiulet_banda_hz": [
@@ -166,13 +182,13 @@
   },
   {
    "n": 2,
-   "inici": 35.7,
-   "final": 38.3,
+   "inici": 35.4,
+   "final": 37.4,
    "xiulet": null,
    "costat_servei": "proper",
    "confianca_servei": 0.83,
    "guanya_costat": "llunya",
-   "confianca": 0.65
+   "confianca": 0.64
   },
   {
    "n": 3,
@@ -180,23 +196,23 @@
    "final": 50.2,
    "xiulet": 39.14,
    "costat_servei": "llunya",
-   "confianca_servei": 0.65,
+   "confianca_servei": 0.64,
    "guanya_costat": "proper",
-   "confianca": 0.65
+   "confianca": 0.64
   },
   {
    "n": 4,
-   "inici": 62.7,
+   "inici": 62.5,
    "final": 65.3,
    "xiulet": null,
    "costat_servei": "proper",
-   "confianca_servei": 0.88,
+   "confianca_servei": 0.87,
    "guanya_costat": "llunya",
    "confianca": 0.4
   },
   {
    "n": 5,
-   "inici": 72.0,
+   "inici": 71.5,
    "final": 74.6,
    "xiulet": null,
    "costat_servei": "llunya",
@@ -237,7 +253,7 @@
   {
    "n": 9,
    "inici": 136.0,
-   "final": 142.0,
+   "final": 142.1,
    "xiulet": null,
    "costat_servei": "llunya",
    "confianca_servei": 0.4,
@@ -250,13 +266,13 @@
    "final": 156.3,
    "xiulet": 144.45,
    "costat_servei": "proper",
-   "confianca_servei": 0.88,
+   "confianca_servei": 0.89,
    "guanya_costat": "llunya",
    "confianca": 0.4
   },
   {
    "n": 11,
-   "inici": 177.0,
+   "inici": 177.5,
    "final": 183.2,
    "xiulet": null,
    "costat_servei": "llunya",
@@ -282,7 +298,7 @@
    "costat_servei": "proper",
    "confianca_servei": 1.0,
    "guanya_costat": "proper",
-   "confianca": 0.95
+   "confianca": 0.97
   },
   {
    "n": 14,
@@ -290,37 +306,37 @@
    "final": 210.0,
    "xiulet": 203.84,
    "costat_servei": "proper",
-   "confianca_servei": 0.95,
+   "confianca_servei": 0.97,
    "guanya_costat": "proper",
-   "confianca": 0.95
+   "confianca": 0.97
   },
   {
    "n": 15,
-   "inici": 223.2,
-   "final": 225.2,
+   "inici": 223.6,
+   "final": 225.6,
    "xiulet": 222.27,
    "costat_servei": "proper",
    "confianca_servei": 1.0,
    "guanya_costat": "proper",
-   "confianca": 0.94
+   "confianca": 0.96
   },
   {
    "n": 16,
-   "inici": 232.9,
+   "inici": 232.8,
    "final": 238.4,
    "xiulet": 230.29,
    "costat_servei": "proper",
-   "confianca_servei": 0.94,
+   "confianca_servei": 0.96,
    "guanya_costat": "proper",
-   "confianca": 0.94
+   "confianca": 0.96
   },
   {
    "n": 17,
    "inici": 244.9,
-   "final": 252.9,
+   "final": 247.9,
    "xiulet": 240.13,
    "costat_servei": "proper",
-   "confianca_servei": 0.95,
+   "confianca_servei": 0.96,
    "guanya_costat": "llunya",
    "confianca": 0.4
   },
@@ -337,23 +353,23 @@
   {
    "n": 19,
    "inici": 272.5,
-   "final": 277.7,
+   "final": 280.9,
    "xiulet": null,
    "costat_servei": "llunya",
    "confianca_servei": 0.4,
-   "guanya_costat": "proper",
+   "guanya_costat": "llunya",
    "confianca": 0.4
   },
   {
    "n": 20,
-   "inici": 282.9,
+   "inici": 283.9,
    "final": 287.6,
    "xiulet": 280.85,
-   "costat_servei": "proper",
-   "confianca_servei": 0.81,
+   "costat_servei": "llunya",
+   "confianca_servei": 0.71,
    "guanya_costat": null,
    "confianca": 0.0
   }
  ],
- "creat": "2026-10-03 21:46"
+ "creat": "2026-10-03 23:48"
 }

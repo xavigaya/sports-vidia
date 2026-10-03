@@ -23,9 +23,25 @@
    ],
    [
     0.2641,
-    0.3556
+    0.3542
    ]
-  ]
+  ],
+  "punts_mig": [
+   [
+    0.3438,
+    0.9056
+   ],
+   [
+    0.7266,
+    0.5972
+   ],
+   [
+    0.1812,
+    0.6111
+   ]
+  ],
+  "lent_k": -0.2475,
+  "ordre": "propera esquerra, propera dreta, llunyana dreta, llunyana esquerra; mig fons proper, mig banda dreta, mig banda esquerra"
  },
  "parametres": {
   "xiulet_banda_hz": [
@@ -120,8 +136,8 @@
  "jugades": [
   {
    "n": 1,
-   "inici": 9.6,
-   "final": 12.6,
+   "inici": 9.4,
+   "final": 12.5,
    "xiulet": null,
    "costat_servei": "proper",
    "confianca_servei": 1.0,
@@ -166,7 +182,7 @@
    "costat_servei": "proper",
    "confianca_servei": 1.0,
    "guanya_costat": "proper",
-   "confianca": 0.94
+   "confianca": 0.99
   },
   {
    "n": 6,
@@ -174,7 +190,7 @@
    "final": 108.5,
    "xiulet": 96.14,
    "costat_servei": "proper",
-   "confianca_servei": 0.94,
+   "confianca_servei": 0.99,
    "guanya_costat": "llunya",
    "confianca": 0.72
   },
@@ -190,8 +206,8 @@
   },
   {
    "n": 8,
-   "inici": 156.4,
-   "final": 158.4,
+   "inici": 156.5,
+   "final": 158.5,
    "xiulet": 155.78,
    "costat_servei": "proper",
    "confianca_servei": 1.0,
@@ -210,7 +226,7 @@
   },
   {
    "n": 10,
-   "inici": 188.6,
+   "inici": 188.7,
    "final": 193.7,
    "xiulet": 177.18,
    "costat_servei": "proper",
@@ -226,21 +242,21 @@
    "costat_servei": "proper",
    "confianca_servei": 1.0,
    "guanya_costat": "llunya",
-   "confianca": 0.8
+   "confianca": 0.4
   },
   {
    "n": 12,
-   "inici": 239.8,
-   "final": 243.9,
-   "xiulet": 236.83,
+   "inici": 234.5,
+   "final": 236.8,
+   "xiulet": null,
    "costat_servei": "llunya",
-   "confianca_servei": 0.8,
+   "confianca_servei": 0.4,
    "guanya_costat": "proper",
-   "confianca": 0.8
+   "confianca": 0.4
   },
   {
    "n": 13,
-   "inici": 246.9,
+   "inici": 246.7,
    "final": 264.8,
    "xiulet": 236.83,
    "costat_servei": "proper",
@@ -269,5 +285,5 @@
    "confianca": 0.0
   }
  ],
- "creat": "2026-10-03 21:46"
+ "creat": "2026-10-03 23:47"
 }

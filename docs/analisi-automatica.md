@@ -40,5 +40,9 @@ Estat: **fase 1 en funcionament (v0.1)**. Provada amb dos clips de 5 minuts (Cur
 - La zona darrere la línia llunyana no serveix (hi ha gent i la paret): els serveis llunyans es dedueixen del xiulet i de la pujada de moviment.
 - Clip 1: 15 jugades proposades. Clip 2: 20. Pendent de comparar amb el marcador real per mesurar l'encert.
 
+## Lent ull de peix
+- La càmera té deformació de barril: la línia de fons propera fa una corba de ~36 px al mig (vídeo 1080p).
+- Es corregeix amb un model de divisió d'un coeficient (k ≈ −0,25). El calibratge demana el punt mig de tres línies i, a més, traça automàticament la línia de fons propera. Error residual ~1,4 px.
+
 ## PC de l'usuari
 - NVIDIA GeForce RTX 3070 Laptop, Python 3.13.7.

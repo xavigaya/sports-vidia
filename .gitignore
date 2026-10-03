@@ -1,0 +1,4 @@
+__pycache__/
+*.pyc
+analitzador/parametres.json
+*.mp4

@@ -163,6 +163,31 @@ textarea.inp{width:100%;min-height:150px;font-family:var(--f-mono);font-size:13p
 .insights{display:grid;gap:5px;padding-left:18px;margin:0;max-width:65ch}
 .rep-head{display:flex;flex-wrap:wrap;gap:8px 20px;align-items:baseline}
 .rep-head .res{font-family:var(--f-disp);font-size:34px;font-weight:700}
+.gate{position:fixed;inset:0;z-index:20;background:var(--bg);display:grid;place-items:center;padding:calc(24px + env(safe-area-inset-top,0px)) 16px 24px;overflow:auto}
+.gate .card{width:100%;max-width:390px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:22px;display:grid;gap:12px}
+.gate h1{font-size:32px;line-height:1.05}
+.gate .brand{display:flex;gap:10px;align-items:center;color:var(--muted);font-weight:600;font-size:13px;letter-spacing:.06em;text-transform:uppercase}
+.gate .dot{width:14px;height:14px;border-radius:50%;background:var(--ball);box-shadow:inset 0 0 0 2px var(--blue)}
+.gate form{display:grid;gap:10px}
+.gate .err{color:var(--bad);font-size:14px;min-height:20px}
+.userbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px}
+.chip-u{font-size:13px;font-weight:600;border:1px solid var(--line);border-radius:999px;padding:3px 10px}
+.libview{display:grid;gap:20px}
+.libview h2{font-size:22px}
+.libsec{display:grid;gap:10px}
+.mlist{display:grid;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.mrow{display:grid;grid-template-columns:92px minmax(0,1fr) auto auto;gap:10px;align-items:center;padding:9px 12px;border-bottom:1px solid var(--line)}
+.mrow:last-child{border-bottom:0}
+.mrow.cur{background:var(--court)}
+.mrow .mt{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.pill{font-size:12px;font-weight:700;padding:2px 8px;border-radius:999px;border:1px solid;white-space:nowrap}
+.pill.w{color:var(--good);border-color:var(--good)}
+.pill.l{color:var(--bad);border-color:var(--bad)}
+.pill.n{color:var(--muted);border-color:var(--line)}
+.ugrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;align-items:end}
+.ro .edit{display:none!important}
+.ro .del{display:none}
+@media (max-width:560px){.mrow{grid-template-columns:minmax(0,1fr) auto}.mrow .md{grid-column:1/-1}}
 .toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:8px;font-weight:600;opacity:0;transition:opacity .2s;pointer-events:none;z-index:9}
 .toast.on{opacity:1}
 @media (prefers-reduced-motion:reduce){.toast{transition:none}}
@@ -172,12 +197,13 @@ textarea.inp{width:100%;min-height:150px;font-family:var(--f-mono);font-size:13p
 <body>
 
 
+<div class="gate" id="gate"><div class="card" id="gateCard"><p class="muted">Carregant…</p></div></div>
 <div class="wrap">
   <header class="board">
     <div class="title">
       <h1 id="mTitle">Partit</h1>
       <div class="muted" id="mSub"></div>
-      <div class="row" style="margin-top:6px"><button class="btn pri" id="installBtn" hidden>Instal·la l'app</button><span class="offline" id="offBadge" hidden>Sense connexió</span></div>
+      <div class="userbar"><span class="chip-u" id="whoami"></span><button class="btn" id="btnPartits">Partits i temporada</button><button class="btn" id="btnLock">Surt</button><button class="btn pri" id="installBtn" hidden>Instal·la l'app</button><span class="offline" id="offBadge" hidden>Sense connexió</span></div>
     </div>
     <div class="score">
       <div class="team"><span class="n" id="nNos">Nosaltres</span><span class="p num" id="sNos">0</span><span class="sw num"><span class="serve-dot" id="dNos"></span> sets <b id="wNos">0</b></span></div>
@@ -187,7 +213,7 @@ textarea.inp{width:100%;min-height:150px;font-family:var(--f-mono);font-size:13p
     <div class="rotbox">
       <span class="label">Rotació</span>
       <span class="r num" id="sRot">R1</span>
-      <div class="mini-btns">
+      <div class="mini-btns edit">
         <button class="mini" id="rotPrev" title="Rotació anterior">−</button>
         <button class="mini" id="rotNext" title="Rotació següent">+</button>
         <button class="mini" id="servTog" title="Canvia qui serveix">Saque</button>
@@ -196,14 +222,14 @@ textarea.inp{width:100%;min-height:150px;font-family:var(--f-mono);font-size:13p
     <div class="rotbox">
       <span class="label">Rival</span>
       <span class="r rr num" id="sRR">–</span>
-      <div class="mini-btns">
+      <div class="mini-btns edit">
         <button class="mini" id="rrPrev" title="Rotació rival anterior">−</button>
         <button class="mini" id="rrNext" title="Rotació rival següent">+</button>
       </div>
     </div>
   </header>
 
-  <div class="main">
+  <div class="main" id="mainView">
     <section class="panel" aria-label="Vídeo i registre">
       <div class="video" id="videoBox">
         <div id="yt"></div>
@@ -231,6 +257,7 @@ textarea.inp{width:100%;min-height:150px;font-family:var(--f-mono);font-size:13p
       <div class="warn" id="alinWarn" hidden></div>
       <div class="pista" id="pista"></div>
       <div class="note" id="libInfo"></div>
+      <div class="edit" style="display:grid;gap:12px">
       <div class="row">
         <button class="btn" id="btnAlin">Alineació</button>
         <button class="btn" id="btnCanvi">Canvi</button>
@@ -263,6 +290,7 @@ textarea.inp{width:100%;min-height:150px;font-family:var(--f-mono);font-size:13p
         <button class="btn" id="undo">Desfés l'últim</button>
       </div>
       <div class="note">Els punts per as, error, atac o bloqueig decisius es compten sols. Fes servir els botons de punt per errors del rival o jugades que no has registrat.</div>
+    </div>
     </section>
 
     <section class="panel" aria-label="Anàlisi">
@@ -275,6 +303,7 @@ textarea.inp{width:100%;min-height:150px;font-family:var(--f-mono);font-size:13p
     </section>
   </div>
 </div>
+<div class="wrap" id="libWrap" hidden><section class="panel libview" id="libView"></section></div>
 <div class="toast" id="toast" role="status"></div>
 
 <script>
@@ -340,14 +369,12 @@ function sample(){
 function empty(){return {meta:{nom:"Partit nou",url:"",videoId:"",equip:"Nosaltres",rival:"Rival",data:new Date().toISOString().slice(0,10),exemple:false},cfg:{rot0:1,serv0:'nos'},alin:{},jug:[],ev:[],nextId:1}}
 
 /* ---------- Estat ---------- */
-let S;
-try{const raw=localStorage.getItem(KEY);S=raw?JSON.parse(raw):null}catch(e){S=null}
-if(!S||!S.ev)S=sample();
+let S=empty();
 if(!S.alin)S.alin={};
 let ui={alin:false,canvi:false,lib:false,dismissed:{}};
 let sel={jug:null,fon:null,zi:null,zf:null};
 let tab='reg',fSet='tots',heatF='A',heatJ='tots',heatMode='zf';
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+/* save() i el magatzem xifrat són més avall */
 
 /* ---------- Lògica de joc ---------- */
 const nextRot=r=>r===1?6:r-1, prevRot=r=>r===6?1:r+1;
@@ -521,7 +548,7 @@ function renderPista(){
   const libs=[st.lib,st.lib2].filter(Boolean);
   $('#libInfo').textContent=st.court&&libs.length?`Lliure${libs.length>1?'s':''}: ${libs.map(n=>n+' '+first(n)+(n===st.libCur&&libs.length>1?' (actiu)':'')).join(' · ')} · mode ${st.libMode==='manual'?'manual':'automàtic'}${st.libMode==='auto'&&st.libPer.length?' per '+st.libPer.join(', '):''}`:'';
   // Assistent d'inici de set: s'obre sol quan comença un set sense alineació
-  if(S.jug.length&&!has&&st.nos+st.ells===0&&st.wn<3&&st.we<3&&!ui.alin&&!ui.dismissed[st.set]){openAlin(st.set,true)}
+  if(S.jug.length&&!has&&st.nos+st.ells===0&&st.wn<3&&st.we<3&&canEdit()&&!ui.alin&&!ui.dismissed[st.set]){openAlin(st.set,true)}
 }
 function optList(list,selv){return '<option value="">—</option>'+list.map(j=>`<option value="${j.num}" ${selv===j.num?'selected':''}>${j.num} · ${esc(j.nom)}${j.pos?' ('+esc(j.pos)+')':''}</option>`).join('')}
 function openAlin(n,auto){
@@ -893,6 +920,7 @@ function fromCSV(txt){
 }
 function splitCSV(l){const o=[];let cur='',q=false;for(let i=0;i<l.length;i++){const ch=l[i];if(q){if(ch==='"'&&l[i+1]==='"'){cur+='"';i++}else if(ch==='"')q=false;else cur+=ch}else if(ch==='"')q=true;else if(ch===','){o.push(cur);cur=''}else cur+=ch}o.push(cur);return o}
 function viewCfg(){
+  if(!canEdit())return `<div class="cfg"><div><span class="label">Partit</span><div>${esc(S.meta.nom)}</div></div><div><span class="label">Data</span><div>${esc(S.meta.data||'')}</div></div><div><span class="label">Equips</span><div>${esc(S.meta.equip)} – ${esc(S.meta.rival)}</div></div></div><p class="note">Tens accés de consulta: pots veure les dades i exportar-les, però no modificar-les.</p><div class="row"><button class="btn" id="cCopy">Copia CSV</button><button class="btn" id="cDown">Descarrega CSV</button></div><textarea class="inp" id="cCsv" readonly hidden></textarea>`;
   const roster=[...S.jug].sort((a,b)=>a.num-b.num).map(j=>`${j.num} ${j.nom}${j.pos?' | '+j.pos:''}`).join('\n');
   return `<div class="cfg">
     <label>Nom del partit<input class="inp" id="cNom" value="${esc(S.meta.nom)}"></label>
@@ -914,15 +942,16 @@ function viewCfg(){
     <button class="btn" id="cDown">Descarrega CSV</button>
     <label class="btn" style="cursor:pointer">Importa CSV<input type="file" id="cImp" accept=".csv,text/csv" hidden></label>
   </div>
-  <p class="note">Les dades es guarden només en aquest navegador. Exporta el CSV en acabar cada partit. Si la descàrrega no funciona en aquesta vista, fes servir Copia CSV i enganxa-ho en un full de càlcul.</p>
+  <p class="note">El partit es desa xifrat en aquest dispositiu. El CSV serveix per obrir les dades en un full de càlcul. Importar un CSV crea un partit nou.</p>
   <textarea class="inp" id="cCsv" readonly hidden></textarea>
   <div class="row" style="margin-top:6px">
-    <button class="btn bad" id="cNew">Partit nou (buida tot)</button>
-    <button class="btn" id="cEx">Carrega l'exemple</button>
+    <button class="btn" id="cNew">Partit nou</button>
+    <button class="btn bad" id="cDelM">Esborra aquest partit</button>
   </div>
   <div class="row" id="cConfirm" hidden><span class="note" id="cConfirmTxt"></span><button class="btn bad" id="cYes">Sí, continua</button><button class="btn" id="cNo">Cancel·la</button></div>`;
 }
 function bindCfg(){
+  if(!canEdit()){$('#cCopy').onclick=()=>{const csv=toCSV(),ta=$('#cCsv');ta.value=csv;copyText(csv,ta,'CSV copiat')};$('#cDown').onclick=()=>offerFile((S.meta.nom||'partit').replace(/[^\w\-]+/g,'_')+'.csv','\ufeff'+toCSV());return}
   $('#cSave').onclick=()=>{
     S.meta.nom=$('#cNom').value.trim()||'Partit';S.meta.data=$('#cData').value;S.meta.equip=$('#cEq').value.trim()||'Nosaltres';S.meta.rival=$('#cRiv').value.trim()||'Rival';
     const url=$('#cUrl').value.trim();const id=ytId(url);if(url&&!id)return toast("No reconec l'enllaç de YouTube");
@@ -934,13 +963,258 @@ function bindCfg(){
   $('#cCopy').onclick=()=>{const csv=toCSV(),ta=$('#cCsv');ta.value=csv;
     copyText(csv,ta,'CSV copiat')};
   $('#cDown').onclick=()=>offerFile((S.meta.nom||'partit').replace(/[^\w\-]+/g,'_')+'.csv','﻿'+toCSV());
-  $('#cImp').onchange=e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{try{const r=fromCSV(rd.result);S.ev=r.ev;S.nextId=r.next;S.meta.exemple=false;save();render();toast(r.ev.length+' esdeveniments importats')}catch(x){toast('El fitxer no té el format esperat')}};rd.readAsText(f)};
+  $('#cImp').onchange=e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{try{const m=empty();withMatch(m,()=>{const r=fromCSV(rd.result);m.ev=r.ev;m.nextId=r.next});m.meta.nom=f.name.replace(/\.csv$/i,'');newMatch(m);toast(m.ev.length+' esdeveniments importats en un partit nou')}catch(x){toast('El fitxer no té el format esperat')}};rd.readAsText(f)};
   let pending=null;
   const ask=(txt,fn)=>{pending=fn;$('#cConfirmTxt').textContent=txt;$('#cConfirm').hidden=false};
-  $('#cNew').onclick=()=>ask('Es perdran totes les accions i la plantilla.',()=>{S=empty();});
-  $('#cEx').onclick=()=>ask("Se substituirà el partit actual per l'exemple.",()=>{S=sample();});
-  $('#cYes').onclick=()=>{if(pending)pending();pending=null;save();sel={jug:null,fon:null,zi:null,zf:null};ytReady?makePlayer():setMode('clock');render()};
+  $('#cNew').onclick=()=>{const m=empty();if(S.jug.length&&!S.meta.exemple){m.jug=JSON.parse(JSON.stringify(S.jug));m.meta.equip=S.meta.equip}newMatch(m);toast('Partit nou creat amb la mateixa plantilla')};
+  $('#cDelM').onclick=()=>ask('Aquest partit i totes les seves accions s\'esborraran.',async()=>{const id=S.id;delete DATA.matches[id];const f=sortedMatches()[0];
+    if(f)openMatch(f.id);else{newMatch(empty())}await persist();toast('Partit esborrat')});
+  $('#cYes').onclick=()=>{const fn=pending;pending=null;if(fn)fn()};
   $('#cNo').onclick=()=>{pending=null;$('#cConfirm').hidden=true};
+}
+
+/* ---------- Magatzem xifrat, usuaris i rols ---------- */
+const VKEY='vidia-vault-v1';
+const ROLES={admin:'Administrador',entrenador:'Entrenador',consulta:'Consulta'};
+let V=null,DATA=null,DEK=null,RAW=null,ME=null,view='match';
+const te=new TextEncoder(),td=new TextDecoder();
+const toB64=u8=>{let x='';for(let i=0;i<u8.length;i+=0x8000)x+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000));return btoa(x)};
+const fromB64=b=>Uint8Array.from(atob(b),c=>c.charCodeAt(0));
+const rnd=n=>crypto.getRandomValues(new Uint8Array(n));
+async function kekFrom(pass,salt,iter){const base=await crypto.subtle.importKey('raw',te.encode(pass),'PBKDF2',false,['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:iter,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['encrypt','decrypt'])}
+async function aesEnc(key,bytes){const iv=rnd(12);const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},key,bytes));return {iv:toB64(iv),ct:toB64(ct)}}
+async function aesDec(key,o){return new Uint8Array(await crypto.subtle.decrypt({name:'AES-GCM',iv:fromB64(o.iv)},key,fromB64(o.ct)))}
+async function gz(bytes,dir){if(typeof CompressionStream==='undefined')return null;
+  const cs=dir==='c'?new CompressionStream('gzip'):new DecompressionStream('gzip');
+  return new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(cs)).arrayBuffer())}
+async function makeUser(u,pass,role){const salt=rnd(16),iter=250000;const k=await kekFrom(pass,salt,iter);return {u,role,salt:toB64(salt),iter,key:await aesEnc(k,RAW)}}
+async function unlockUser(user,pass){const k=await kekFrom(pass,fromB64(user.salt),user.iter);return aesDec(k,user.key)}
+async function sealData(){let b=te.encode(JSON.stringify(DATA)),z=0;const c=await gz(b,'c');if(c){b=c;z=1}V.data=Object.assign(await aesEnc(DEK,b),{z});V.updated=Date.now()}
+async function openData(v,dek){let b=await aesDec(dek,v.data);if(v.data.z)b=await gz(b,'d');return JSON.parse(td.decode(b))}
+const idb={db:null,
+  async open(){if(this.db)return this.db;return this.db=await new Promise((res,rej)=>{const r=indexedDB.open('vidia',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})},
+  async get(k){const db=await this.open();return new Promise((res,rej)=>{const q=db.transaction('kv').objectStore('kv').get(k);q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})},
+  async put(k,v){const db=await this.open();return new Promise((res,rej)=>{const t=db.transaction('kv','readwrite');t.objectStore('kv').put(v,k);t.oncomplete=()=>res();t.onerror=()=>rej(t.error)})}};
+async function loadVault(){try{const v=await idb.get(VKEY);if(v)return v}catch(e){}try{const r=localStorage.getItem(VKEY);return r?JSON.parse(r):null}catch(e){return null}}
+async function storeVault(){try{await idb.put(VKEY,V);return true}catch(e){}
+  try{localStorage.setItem(VKEY,JSON.stringify(V));return true}catch(e){toast("No s'han pogut desar les dades en aquest navegador");return false}}
+const canEdit=()=>!!ME&&ME.role!=='consulta';
+const isAdmin=()=>!!ME&&ME.role==='admin';
+let saveT=null,saving=Promise.resolve();
+function save(){if(!canEdit()||!DEK)return;S.updated=Date.now();clearTimeout(saveT);saveT=setTimeout(()=>{saving=saving.then(persist)},300)}
+async function persist(){if(!DEK)return;await sealData();await storeVault()}
+async function flush(){clearTimeout(saveT);await saving;if(DEK&&canEdit())await persist()}
+function withMatch(m,fn){const old=S;S=m;try{return fn()}finally{S=old}}
+function matchId(){return 'm'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
+function addMatch(m){m.id=m.id||matchId();m.created=m.created||Date.now();m.updated=Date.now();if(!m.alin)m.alin={};DATA.matches[m.id]=m;return m}
+function openMatch(id){const m=DATA.matches[id];if(!m)return;S=m;DATA.current=id;if(!S.alin)S.alin={};
+  sel={jug:null,fon:null,zi:null,zf:null};ui.dismissed={};closeBoxes();clk.base=0;clk.run=false;
+  if(canEdit())save();ytReady?makePlayer():setMode('clock');showView('match');render()}
+function newMatch(m){addMatch(m);openMatch(m.id)}
+function sortedMatches(){return Object.values(DATA.matches).sort((a,b)=>(b.meta.data||'').localeCompare(a.meta.data||'')||b.created-a.created)}
+
+/* ---------- Pantalla d'accés ---------- */
+function gateHTML(inner){return `<div class="brand"><span class="dot"></span>Sports VidIA</div>${inner}`}
+async function startGate(){
+  $('#gate').hidden=false;
+  if(!(window.crypto&&crypto.subtle)){$('#gateCard').innerHTML=gateHTML(`<h1>Accés segur no disponible</h1><p>Obre l'app des d'una adreça segura (https) per poder protegir les dades amb contrasenya.</p>`);return}
+  V=await loadVault();
+  if(!V)return showSetup();
+  showLogin();
+}
+function showSetup(){
+  $('#gateCard').innerHTML=gateHTML(`<h1>Benvingut/da</h1>
+    <p class="muted">Crea el compte d'administrador. Els partits es desaran xifrats en aquest dispositiu i només s'hi podrà accedir amb usuari i contrasenya.</p>
+    <form id="gForm" autocomplete="off">
+      <label class="flabel">Nom d'usuari<input class="inp" id="gU" autocomplete="username" required></label>
+      <label class="flabel">Contrasenya (mínim 8 caràcters)<input class="inp" id="gP" type="password" autocomplete="new-password" required></label>
+      <label class="flabel">Repeteix la contrasenya<input class="inp" id="gP2" type="password" autocomplete="new-password" required></label>
+      <div class="err" id="gErr"></div>
+      <button class="btn pri" type="submit" id="gGo">Crea el compte i entra</button>
+    </form>
+    <p class="note">Si oblides la contrasenya i no hi ha cap altre administrador, les dades no es poden recuperar. Crea un segon administrador o fes còpies de seguretat.</p>`);
+  $('#gForm').onsubmit=async e=>{e.preventDefault();
+    const u=$('#gU').value.trim().toLowerCase(),p=$('#gP').value,p2=$('#gP2').value;
+    if(!/^[\w.\-]{3,30}$/.test(u))return $('#gErr').textContent="L'usuari ha de tenir entre 3 i 30 lletres, números, punts o guions.";
+    if(p.length<8)return $('#gErr').textContent='La contrasenya ha de tenir almenys 8 caràcters.';
+    if(p!==p2)return $('#gErr').textContent='Les contrasenyes no coincideixen.';
+    $('#gGo').disabled=true;$('#gGo').textContent='Creant…';
+    RAW=rnd(32);DEK=await crypto.subtle.importKey('raw',RAW,{name:'AES-GCM'},false,['encrypt','decrypt']);
+    V={v:1,users:[await makeUser(u,p,'admin')],data:null,created:Date.now()};
+    DATA={matches:{},current:null};
+    let old=null;try{old=JSON.parse(localStorage.getItem('vidia-volei-v3')||'null')}catch(x){}
+    const ex=addMatch(sample());
+    if(old&&old.ev&&!old.meta.exemple){old.id=null;addMatch(old);DATA.current=old.id}else DATA.current=ex.id;
+    ME={u,role:'admin'};await persist();
+    try{localStorage.removeItem('vidia-volei-v3')}catch(x){}
+    enter();
+  };
+}
+function showLogin(msg){
+  $('#gateCard').innerHTML=gateHTML(`<h1>Entra</h1>
+    ${msg?`<p class="muted">${esc(msg)}</p>`:''}
+    <form id="gForm">
+      <label class="flabel">Usuari<input class="inp" id="gU" autocomplete="username" required></label>
+      <label class="flabel">Contrasenya<input class="inp" id="gP" type="password" autocomplete="current-password" required></label>
+      <div class="err" id="gErr"></div>
+      <button class="btn pri" type="submit" id="gGo">Entra</button>
+    </form>
+    <p class="note">Has oblidat la contrasenya? Demana a un administrador que te'n posi una de nova.</p>`);
+  $('#gForm').onsubmit=async e=>{e.preventDefault();
+    const u=$('#gU').value.trim().toLowerCase(),p=$('#gP').value;
+    const user=V.users.find(x=>x.u===u);
+    $('#gGo').disabled=true;$('#gGo').textContent='Comprovant…';
+    try{
+      if(!user)throw 0;
+      RAW=await unlockUser(user,p);
+      DEK=await crypto.subtle.importKey('raw',RAW,{name:'AES-GCM'},false,['encrypt','decrypt']);
+      DATA=V.data?await openData(V,DEK):{matches:{},current:null};
+      ME={u:user.u,role:user.role};enter();
+    }catch(x){RAW=DEK=null;$('#gErr').textContent='Usuari o contrasenya incorrectes.';$('#gGo').disabled=false;$('#gGo').textContent='Entra';$('#gP').value='';$('#gP').focus()}
+  };
+  setTimeout(()=>{const f=$('#gU');f&&f.focus&&f.focus()},50);
+}
+function enter(){
+  $('#gate').hidden=true;
+  document.body.classList.toggle('ro',!canEdit());
+  $('#whoami').textContent=`${ME.u} · ${ROLES[ME.role]}`;
+  if(!DATA.matches[DATA.current]){const f=sortedMatches()[0];if(f)DATA.current=f.id;else if(canEdit()){addMatch(empty());DATA.current=Object.keys(DATA.matches)[0]}}
+  if(DATA.matches[DATA.current]){openMatch(DATA.current)}else{S=empty();showView('lib')}
+  lastAct=Date.now();
+}
+async function lock(msg){await flush();V=await loadVault()||V;DATA=null;DEK=null;RAW=null;ME=null;S=empty();closeBoxes();showView('match');render();showLogin(msg);$('#gate').hidden=false}
+let lastAct=Date.now();
+['click','keydown','touchstart'].forEach(t=>document.addEventListener(t,()=>{lastAct=Date.now()},{passive:true}));
+setInterval(()=>{if(ME&&Date.now()-lastAct>30*60*1000)lock('La sessió s\'ha tancat després de 30 minuts sense activitat.')},60000);
+$('#btnLock').onclick=()=>lock();
+$('#btnPartits').onclick=()=>showView(view==='lib'?'match':'lib');
+function showView(v){view=v;$('#mainView').hidden=v!=='match';$('#libWrap').hidden=v!=='lib';
+  $('#btnPartits').textContent=v==='lib'?'Torna al partit':'Partits i temporada';if(v==='lib')renderLib()}
+
+/* ---------- Partits i temporada ---------- */
+function matchSummary(m){return withMatch(m,()=>{const {der,st}=replay();const s=summary(der,st);
+  const done=st.wn===3||st.we===3;return {m,st,s,done,res:done?(st.wn>st.we?'w':'l'):'n'}})}
+let libTeam=null,libDel=null;
+function renderLib(){
+  if(!DATA){$('#libView').innerHTML='';return}
+  const list=sortedMatches();const sums=list.map(matchSummary);
+  const teams=[...new Set(list.filter(m=>!m.meta.exemple).map(m=>m.meta.equip))];
+  if(!teams.includes(libTeam))libTeam=teams[0]||null;
+  const rows=sums.map(({m,st,res})=>`<div class="mrow ${m.id===DATA.current?'cur':''}">
+      <span class="num muted">${esc(m.meta.data||'')}</span>
+      <span class="mt"><b>${esc(m.meta.equip)} – ${esc(m.meta.rival)}</b>${m.meta.exemple?' <span class="badge">Exemple</span>':''}<br><span class="note">${esc(m.meta.nom)} · ${m.ev.filter(e=>e.tipus==='acc').length} accions</span></span>
+      <span class="pill ${res}">${st.wn}–${st.we}${res==='n'?' en joc':''}</span>
+      <span class="row md">${libDel===m.id?`<span class="note">Segur?</span><button class="btn bad" data-ldelok="${m.id}">Esborra</button><button class="btn" data-ldelno="1">No</button>`
+        :`<button class="btn ${m.id===DATA.current?'':'pri'}" data-lopen="${m.id}">${m.id===DATA.current?'Obert':'Obre'}</button>${canEdit()?`<button class="del" data-ldel="${m.id}" aria-label="Esborra el partit">×</button>`:''}`}</span>
+    </div>`).join('');
+  $('#libView').innerHTML=`<div class="libsec">
+      <div class="row" style="justify-content:space-between"><h2>Partits desats</h2>
+        <span class="row edit"><button class="btn pri" id="lNew">Partit nou</button><button class="btn" id="lEx">Afegeix l'exemple</button></span></div>
+      <div class="mlist">${rows||'<div class="mrow"><span class="mt muted">Encara no hi ha partits.</span></div>'}</div>
+      <p class="note">Els partits es desen xifrats en aquest dispositiu cada vegada que registres una acció.</p>
+    </div>
+    <div class="libsec">${seasonHTML(sums)}</div>
+    <div class="libsec"><h2>Còpia de seguretat</h2>
+      <p class="note">La còpia conté tots els partits, xifrats. Serveix per guardar-los fora del dispositiu o passar-los a un altre. Per importar-la cal un usuari i una contrasenya vàlids de la còpia.</p>
+      <div class="row"><button class="btn" id="lExp">Exporta còpia xifrada</button>
+        <label class="btn edit" style="cursor:pointer">Importa una còpia<input type="file" id="lImp" accept=".json,application/json" hidden></label></div>
+      <div class="sub" id="lImpBox" hidden></div>
+    </div>
+    <div class="libsec">${usersHTML()}</div>`;
+  bindLib(sums);
+}
+function seasonHTML(sums){
+  const teams=[...new Set(sums.filter(x=>!x.m.meta.exemple).map(x=>x.m.meta.equip))];
+  if(!teams.length)return `<h2>Temporada</h2><p class="note">Quan tinguis partits propis (no d'exemple), aquí en veuràs el resum i les estadístiques acumulades per jugador/a.</p>`;
+  const ms=sums.filter(x=>!x.m.meta.exemple&&x.m.meta.equip===libTeam).slice().reverse();
+  const w=ms.filter(x=>x.res==='w').length,l=ms.filter(x=>x.res==='l').length;
+  const sw=ms.reduce((a,x)=>a+x.st.wn,0),sl=ms.reduce((a,x)=>a+x.st.we,0);
+  const pw=ms.reduce((a,x)=>a+x.s.won,0),pl=ms.reduce((a,x)=>a+x.s.lost,0);
+  const mrows=ms.map(({m,st,s,res})=>`<tr><td>${esc(m.meta.data||'')} · ${esc(m.meta.rival)}</td><td class="${res==='w'?'g':res==='l'?'b':''}">${st.wn}–${st.we}</td><td>${s.won}–${s.lost}</td><td>${P(s.atk.eff)}</td><td>${P(s.rec.pos)}</td><td>${P(s.so)}</td><td>${P(s.br)}</td><td>${s.srv['#']}/${s.srv['=']}</td></tr>`).join('');
+  const agg={};
+  ms.forEach(({m})=>withMatch(m,()=>{const {der}=replay();const A=der.filter(e=>e.tipus==='acc'),PT=der.filter(e=>e.tipus==='punt');
+    playerRows(A,PT).forEach(p=>{const k=p.n+'|'+jname(p.n);const g=agg[k]||(agg[k]={n:p.n,nom:jname(p.n),pj:0,pts:0,err:0,at:0,ak:0,ae:0,rt:0,rp:0,sa:0,se:0,bk:0,pm:0,jug:0});
+      g.pj++;g.pts+=p.pts;g.err+=p.err;g.at+=p.a.tot;g.ak+=p.a['#'];g.ae+=p.a['='];g.rt+=p.r.tot;g.rp+=p.r['#']+p.r['+'];g.sa+=p.s['#'];g.se+=p.s['='];g.bk+=p.b['#'];g.jug+=p.jug;if(p.pm!=null)g.pm+=p.pm})}));
+  const prow=Object.values(agg).sort((a,b)=>b.pts-a.pts).map(g=>`<tr><td>${g.n} · ${esc(g.nom)}</td><td>${g.pj}</td><td class="g">${g.pts}</td><td>${(g.pts/g.pj).toFixed(1)}</td><td>${g.at?P(pct(g.ak-g.ae,g.at)):'–'}</td><td>${g.rt?P(pct(g.rp,g.rt)):'–'}</td><td>${g.sa}/${g.se}</td><td>${g.bk}</td><td class="${g.pm>0?'g':g.pm<0?'b':''}">${g.jug?(g.pm>0?'+':'')+g.pm:'–'}</td></tr>`).join('');
+  return `<div class="row" style="justify-content:space-between"><h2>Temporada</h2>
+      ${teams.length>1?`<select class="inp" id="lTeam" aria-label="Equip">${teams.map(t=>`<option ${t===libTeam?'selected':''}>${esc(t)}</option>`).join('')}</select>`:`<span class="muted">${esc(libTeam)}</span>`}</div>
+    <div class="kpis">
+      <div class="kpi"><span class="label">Partits</span><b class="num">${ms.length}</b></div>
+      <div class="kpi"><span class="label">Victòries – derrotes</span><b class="num">${w}–${l}</b></div>
+      <div class="kpi"><span class="label">Sets</span><b class="num">${sw}–${sl}</b></div>
+      <div class="kpi"><span class="label">Punts</span><b class="num">${pw}–${pl}</b></div></div>
+    <h3 style="font-size:18px">Partit a partit</h3>
+    <div class="tbl-wrap"><table><thead><tr><th>Partit</th><th>Sets</th><th>Punts</th><th>Efic. atac</th><th>Rec+</th><th>Side-out</th><th>Break</th><th>As/Err</th></tr></thead><tbody>${mrows}</tbody></table></div>
+    <h3 style="font-size:18px">Jugadors (acumulat)</h3>
+    <div class="tbl-wrap"><table><thead><tr><th>Jugador/a</th><th>PJ</th><th>Punts</th><th>Punts/PJ</th><th>Efic. atac</th><th>Rec+</th><th>As/Err</th><th>Bloq#</th><th>+/−</th></tr></thead><tbody>${prow}</tbody></table></div>
+    <p class="note">PJ = partits amb alguna acció o punt a pista. Els partits d'exemple no compten.</p>`;
+}
+function usersHTML(){
+  const me=`<h2>El meu compte</h2>
+    <div class="ugrid">
+      <label class="flabel">Contrasenya actual<input class="inp" type="password" id="uOld" autocomplete="current-password"></label>
+      <label class="flabel">Contrasenya nova<input class="inp" type="password" id="uNew" autocomplete="new-password"></label>
+      <button class="btn" id="uChg">Canvia la contrasenya</button></div>`;
+  if(!isAdmin())return me;
+  const rows=V.users.map(u=>`<tr><td>${esc(u.u)}${u.u===ME.u?' (tu)':''}</td>
+    <td><select class="inp" data-urole="${esc(u.u)}" ${u.u===ME.u?'disabled':''}>${Object.keys(ROLES).map(r=>`<option value="${r}" ${u.role===r?'selected':''}>${ROLES[r]}</option>`).join('')}</select></td>
+    <td>${u.u===ME.u?'':`<button class="btn" data-ureset="${esc(u.u)}">Contrasenya nova</button> <button class="btn bad" data-udel="${esc(u.u)}">Elimina</button>`}</td></tr>`).join('');
+  return `<h2>Usuaris</h2>
+    <div class="tbl-wrap"><table><thead><tr><th>Usuari</th><th>Rol</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="ugrid">
+      <label class="flabel">Usuari nou<input class="inp" id="nU" autocomplete="off"></label>
+      <label class="flabel">Contrasenya inicial<input class="inp" id="nP" type="password" autocomplete="new-password"></label>
+      <label class="flabel">Rol<select class="inp" id="nR"><option value="entrenador">Entrenador</option><option value="consulta">Consulta</option><option value="admin">Administrador</option></select></label>
+      <button class="btn pri" id="nAdd">Afegeix l'usuari</button></div>
+    <div class="sub" id="uReset" hidden></div>
+    <p class="note">Administrador: ho pot fer tot. Entrenador: registra i edita partits. Consulta: només pot veure partits i estadístiques. Els usuaris i les contrasenyes només existeixen en aquest dispositiu.</p>
+    ${me}`;
+}
+async function saveUsers(){await flush();await sealData();await storeVault()}
+function bindLib(){
+  const L=$('#libView');
+  L.onclick=async e=>{const b=e.target.closest('button');if(!b)return;const d=b.dataset;
+    if(d.lopen){openMatch(d.lopen)}
+    else if(d.ldel){libDel=d.ldel;renderLib()}
+    else if(d.ldelno){libDel=null;renderLib()}
+    else if(d.ldelok){const id=d.ldelok;delete DATA.matches[id];libDel=null;
+      if(DATA.current===id){const f=sortedMatches()[0];DATA.current=f?f.id:null;S=f||empty();if(f)render()}
+      await persist();renderLib();toast('Partit esborrat')}
+    else if(d.ureset){const u=d.ureset;const box=$('#uReset');box.hidden=false;
+      box.innerHTML=`<b>Contrasenya nova per a ${esc(u)}</b><div class="ugrid"><label class="flabel">Contrasenya<input class="inp" type="password" id="rP" autocomplete="new-password"></label><button class="btn pri" id="rGo">Desa</button><button class="btn" id="rNo">Cancel·la</button></div>`;
+      $('#rNo').onclick=()=>{box.hidden=true};
+      $('#rGo').onclick=async()=>{const p=$('#rP').value;if(p.length<8)return toast('Mínim 8 caràcters');
+        const i=V.users.findIndex(x=>x.u===u);const role=V.users[i].role;V.users[i]=await makeUser(u,p,role);await saveUsers();box.hidden=true;toast('Contrasenya canviada')}}
+    else if(d.udel){const u=d.udel;const left=V.users.filter(x=>x.u!==u);if(!left.some(x=>x.role==='admin'))return toast('Ha de quedar almenys un administrador');
+      if(b.dataset.sure!=='1'){b.dataset.sure='1';b.textContent='Confirma';return}
+      V.users=left;await saveUsers();renderLib();toast('Usuari eliminat')}
+  };
+  const lt=$('#lTeam');if(lt)lt.onchange=e=>{libTeam=e.target.value;renderLib()};
+  const ln=$('#lNew');if(ln)ln.onclick=()=>{const m=empty();if(S&&S.jug.length&&!S.meta.exemple){m.jug=JSON.parse(JSON.stringify(S.jug));m.meta.equip=S.meta.equip}newMatch(m);toast('Partit nou creat')};
+  const le=$('#lEx');if(le)le.onclick=()=>{newMatch(sample());toast("Partit d'exemple afegit")};
+  L.querySelectorAll('[data-urole]').forEach(sel=>sel.onchange=async()=>{const u=sel.dataset.urole;const left=V.users.map(x=>x.u===u?{...x,role:sel.value}:x);
+    if(!left.some(x=>x.role==='admin'))return toast('Ha de quedar almenys un administrador');V.users=left;await saveUsers();toast('Rol actualitzat')});
+  const na=$('#nAdd');if(na)na.onclick=async()=>{const u=$('#nU').value.trim().toLowerCase(),p=$('#nP').value,r=$('#nR').value;
+    if(!/^[\w.\-]{3,30}$/.test(u))return toast("Usuari no vàlid (3-30 lletres, números, punts o guions)");
+    if(V.users.some(x=>x.u===u))return toast('Aquest usuari ja existeix');
+    if(p.length<8)return toast('La contrasenya ha de tenir almenys 8 caràcters');
+    na.disabled=true;V.users.push(await makeUser(u,p,r));await saveUsers();renderLib();toast(`Usuari ${u} creat`)};
+  $('#uChg').onclick=async()=>{const o=$('#uOld').value,n=$('#uNew').value;if(n.length<8)return toast('La contrasenya nova ha de tenir almenys 8 caràcters');
+    const i=V.users.findIndex(x=>x.u===ME.u);try{await unlockUser(V.users[i],o)}catch(x){return toast('La contrasenya actual no és correcta')}
+    V.users[i]=await makeUser(ME.u,n,V.users[i].role);await saveUsers();$('#uOld').value=$('#uNew').value='';toast('Contrasenya canviada')};
+  $('#lExp').onclick=async()=>{await flush();offerFile(`sports-vidia-copia-${new Date().toISOString().slice(0,10)}.json`,JSON.stringify({app:'sports-vidia',...V}))};
+  const li=$('#lImp');if(li)li.onchange=e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{let bk;
+    try{bk=JSON.parse(rd.result);if(!bk.users||!bk.data)throw 0}catch(x){return toast('Aquest fitxer no és una còpia de Sports VidIA')}
+    const box=$('#lImpBox');box.hidden=false;
+    box.innerHTML=`<b>Importa la còpia (${bk.users.length} usuaris)</b><div class="ugrid"><label class="flabel">Usuari de la còpia<input class="inp" id="iU"></label><label class="flabel">Contrasenya<input class="inp" type="password" id="iP"></label><button class="btn pri" id="iGo">Importa els partits</button><button class="btn" id="iNo">Cancel·la</button></div><p class="note">S'afegeixen els partits que no tens i s'actualitzen els que tinguis en una versió més antiga. Els usuaris d'aquest dispositiu no canvien.</p>`;
+    $('#iNo').onclick=()=>{box.hidden=true};
+    $('#iGo').onclick=async()=>{const u=$('#iU').value.trim().toLowerCase(),p=$('#iP').value;const user=bk.users.find(x=>x.u===u);
+      try{if(!user)throw 0;const raw=await unlockUser(user,p);const k=await crypto.subtle.importKey('raw',raw,{name:'AES-GCM'},false,['decrypt']);
+        const d=await openData(bk,k);let n=0;Object.values(d.matches||{}).forEach(m=>{const cur=DATA.matches[m.id];if(!cur||(m.updated||0)>(cur.updated||0)){DATA.matches[m.id]=m;n++}});
+        await persist();box.hidden=true;renderLib();toast(`${n} partits importats o actualitzats`)}
+      catch(x){toast('Usuari o contrasenya incorrectes per a aquesta còpia')}};
+  };rd.readAsText(f)};
 }
 
 /* ---------- Render ---------- */
@@ -954,7 +1228,7 @@ function render(){
   $('#dNos').classList.toggle('on',st.serv==='nos');$('#dElls').classList.toggle('on',st.serv==='ells');
   renderPicker();renderView();
 }
-booted=true;render();
+booted=true;render();startGate();
 })();
 </script>
 

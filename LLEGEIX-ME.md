@@ -34,10 +34,14 @@ Copia els fitxers a qualsevol espai web estàtic amb HTTPS (per exemple, el serv
 - **iPhone / iPad (Safari)**: botó Compartir → **Afegeix a la pantalla d'inici**.
 - **Ordinador (Chrome / Edge)**: icona d'instal·lació a la barra d'adreces.
 
-## Dades
-- Les dades es guarden al navegador de cada dispositiu. No s'envien enlloc.
-- Esborrar les dades del navegador esborra el partit. Exporta el **CSV** en acabar cada partit (pestanya Partit) i torna'l a importar quan calgui.
-- Per passar un partit d'un dispositiu a un altre, exporta el CSV en un i importa'l a l'altre.
+## Accés i dades
+- El primer cop que s'obre l'app en un dispositiu es crea el compte d'**administrador**.
+- L'administrador pot afegir usuaris amb tres rols: **Administrador** (ho pot fer tot), **Entrenador** (registra i edita partits) i **Consulta** (només veu partits i estadístiques).
+- Els partits es desen **xifrats** (AES-256) al navegador del dispositiu. Cada usuari obre les dades amb la seva contrasenya. Sense un usuari vàlid no es poden llegir.
+- La sessió es tanca sola després de 30 minuts sense activitat.
+- Si un usuari oblida la contrasenya, un administrador n'hi pot posar una de nova. Si l'únic administrador oblida la seva, les dades no es poden recuperar: crea un segon administrador o fes còpies.
+- **Còpia de seguretat** (a *Partits i temporada*): exporta un fitxer xifrat amb tots els partits. Serveix per guardar-los fora del dispositiu o passar-los a un altre. Per importar-lo cal un usuari i una contrasenya vàlids de la còpia.
+- Els usuaris i els rols són de cada dispositiu. Els rols limiten què es pot fer des de l'app, però qualsevol usuari amb contrasenya pot llegir les dades xifrades d'aquell dispositiu.
 
 ## Actualitzar-la
 Substitueix els fitxers al servidor. Si canvies `sw.js` o les icones, augmenta el número de `VERSION` dins `sw.js` (per exemple, `vidia-v2`) perquè els dispositius descarreguin la versió nova.

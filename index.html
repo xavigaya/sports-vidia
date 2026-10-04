@@ -70,6 +70,7 @@ button{cursor:pointer}
 @media (max-width:980px){.main{grid-template-columns:minmax(0,1fr)}}
 /* El vídeo sempre a la vista: a l'ordinador, la columna esquerra es queda fixa */
 @media (min-width:981px){.main>section:first-child{position:sticky;top:calc(env(safe-area-inset-top,0px) + 8px);max-height:calc(100vh - 16px);overflow:auto}}
+@media (min-width:981px){.revmode .video{position:sticky;top:0;z-index:3}}
 /* Al mòbil, durant la revisió, el vídeo passa a ser un reproductor petit fix */
 @media (max-width:980px){.revmode .video{position:fixed;right:8px;bottom:calc(8px + env(safe-area-inset-bottom,0px));width:min(52vw,340px);z-index:15;box-shadow:0 6px 24px rgba(0,0,0,.35);border:1px solid var(--line)}}
 .revlist{max-height:min(62vh,640px);overflow:auto;border:1px solid var(--line);border-radius:8px}
@@ -162,6 +163,22 @@ textarea.inp{width:100%;min-height:150px;font-family:var(--f-mono);font-size:13p
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
 .seg button{border:0;background:var(--surface);padding:6px 10px;font-weight:600}
 .seg button.on{background:var(--blue);color:var(--blue-ink)}
+.acourt{display:grid;gap:6px;max-width:420px}
+.anet{text-align:center;font-size:11px;letter-spacing:.2em;font-weight:700;color:var(--muted);border-bottom:4px solid var(--ink);padding-bottom:2px}
+.agrid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;background:var(--line);padding:5px;border-radius:0 0 8px 8px}
+.agrid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;max-width:280px}
+.acell{border:2px solid transparent;background:var(--court);border-radius:6px;padding:8px 4px;display:grid;justify-items:center;min-width:0;min-height:72px}
+.acell b{font-family:var(--f-disp);font-size:26px;line-height:1.05}
+.acell small{font-size:11px;color:var(--muted);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.acell .pp{font-size:10px;letter-spacing:.06em;color:var(--muted);font-weight:700}
+.acell.empty b{color:var(--muted);font-weight:500}
+.acell.libc{background:color-mix(in srgb,var(--ball) 22%,var(--court))}
+.acell.on{border-color:var(--blue);box-shadow:0 0 0 3px color-mix(in srgb,var(--blue) 30%,transparent)}
+#aRoster .chip{position:relative}
+#aRoster .chip.used{opacity:.55}
+#aRoster .chip em{position:absolute;top:-7px;right:-5px;font-style:normal;font-size:10px;font-weight:700;background:var(--blue);color:var(--blue-ink);border-radius:999px;padding:0 5px}
+.rotbar{display:grid;gap:8px}
+.rotbar .seg button{min-width:44px}
 .pista .empty{grid-column:1/-1;padding:16px;text-align:center;color:var(--muted);background:var(--court);border-radius:5px}
 .agrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
 .flabel{display:grid;gap:3px;font-size:12px;color:var(--muted);font-weight:600;min-width:0}
@@ -496,7 +513,7 @@ window.onYouTubeIframeAPIReady=function(){ytReady=true;makePlayer()};
   const s=document.createElement('script');s.src='https://www.youtube.com/iframe_api';
   s.onerror=()=>setMode('clock');document.head.appendChild(s);
 })();
-let playUntil=null,revNow=null;
+let playUntil=null,revNow=null,revManual=0;
 function revFollow(){
   document.body.classList.toggle('revmode',booted&&tab==='rev'&&!!S.auto&&view==='match');
   if(mode==='file'&&playUntil!=null){const v=$('#vfile');if(v.currentTime>=playUntil){v.pause();playUntil=null}}
@@ -504,7 +521,7 @@ function revFollow(){
   const list=$('#revList');if(!list||!list.querySelectorAll)return;
   const t=curTime();let cur=null;
   list.querySelectorAll('.li[data-rid]').forEach(el=>{const on=t>=+el.dataset.a-2&&t<=+el.dataset.b+1;el.classList.toggle('now',on);if(on)cur=el});
-  if(cur&&cur.dataset.rid!==revNow){revNow=cur.dataset.rid;
+  if(cur&&cur.dataset.rid!==revNow&&Date.now()-revManual>6000){revNow=cur.dataset.rid;
     const top=cur.offsetTop-list.offsetTop,h=list.clientHeight;
     if(top<list.scrollTop||top>list.scrollTop+h-cur.offsetHeight)list.scrollTop=Math.max(0,top-h/3)}
 }
@@ -590,62 +607,88 @@ function openAlin(n,auto){
   if(!S.jug.length){box.innerHTML=`<span>Afegeix primer la plantilla a la pestanya <b>Partit</b>.</span><div class="row"><button class="btn" id="aCancel">Tanca</button></div>`;$('#aCancel').onclick=closeBoxes;return}
   const a=S.alin[n]||{};
   const prev=S.alin[n-1]&&validAlin(S.alin[n-1])?S.alin[n-1]:null;
-  const pre=validAlin(a)?a.pos:(n===st.set&&st.court?st.court:(prev?prev.pos:[]));
   const ref=validAlin(a)?a:(prev||{});
   const roster=[...S.jug].sort((x,y)=>x.num-y.num);
-  const lib1=a.lib||ref.lib||null,lib2=a.lib2||ref.lib2||null;
-  const per=Array.isArray(a.libPer)?a.libPer:(Array.isArray(ref.libPer)?ref.libPer:defaultLibPer(pre));
-  const mode=a.libMode||ref.libMode||'auto';
+  // estat de l'editor: 6 posicions (índex 0 = P1) i 2 lliures
+  const E={pos:(validAlin(a)?a.pos:(n===st.set&&st.court?st.court:(prev?prev.pos:[]))).slice(0,6),
+    lib:[a.lib||ref.lib||null,a.lib2||ref.lib2||null],sel:null,mode:a.libMode||ref.libMode||'auto',per:null};
+  while(E.pos.length<6)E.pos.push(null);
+  E.per=Array.isArray(a.libPer)?a.libPer.slice():(Array.isArray(ref.libPer)?ref.libPer.slice():defaultLibPer(E.pos.filter(Boolean)));
+  E.sel=E.pos.findIndex(x=>!x);if(E.sel<0)E.sel=null;
   const servDefault=a.serv||(prev?(prev.serv==='nos'?'ells':'nos'):'nos');
+  const hasSetter=S.jug.some(j=>isSetter(j.num));
   box.innerHTML=`<div class="row" style="justify-content:space-between"><b>${auto?`Inici del set ${n}`:'Alineació inicial'}</b>
     <select class="inp" id="aSetN" aria-label="Set">${[1,2,3,4,5].map(k=>`<option value="${k}" ${k===n?'selected':''}>Set ${k}</option>`).join('')}</select></div>
-    ${auto?`<div class="note">Indica com comencen els dos equips. Pots partir de l'alineació del set anterior i girar-la fins a la rotació inicial.</div>`:''}
-    <div class="row">${prev?`<button class="btn" id="aCopy">Copia el set ${n-1}</button>`:''}
-      <div class="rotprev"><button class="btn" id="aRotB" title="Gira cap enrere">↺</button><span class="r num" id="aRot">–</span><button class="btn" id="aRotF" title="Gira cap endavant">↻</button></div></div>
-    <div class="note">Xarxa a dalt. P1 serveix quan el saque és nostre. Les fletxes giren les sis posicions sense canviar-ne l'ordre.</div>
-    <div class="agrid">${[3,2,1,4,5,0].map(i=>`<label class="flabel">P${i+1}<select class="inp" id="aP${i}">${optList(roster,pre[i])}</select></label>`).join('')}</div>
+    <div class="note"><b>1.</b> Toca una posició de la pista. <b>2.</b> Toca el jugador/a que hi comença. La posició següent buida queda triada sola.</div>
+    <div class="acourt" id="aCourt"></div>
+    <div class="flabel">Jugadors/es<div class="chips" id="aRoster"></div></div>
+    <div class="rotbar">
+      <span class="flabel" style="gap:2px">Rotació inicial<span class="note">${hasSetter?"Posició on comença el col·locador (R1 = col·locador a P1). Tria una rotació i l'alineació gira fins a aconseguir-la.":"Per calcular-la, marca el col·locador a la plantilla amb la posició <b>Col</b>."}</span></span>
+      <div class="seg" id="aRots">${[1,6,5,4,3,2].map(r=>`<button type="button" data-ar="${r}">R${r}</button>`).join('')}</div>
+      <div class="row" style="gap:6px"><button class="btn" id="aRotB" title="Gira cap enrere">↺</button><button class="btn" id="aRotF" title="Gira com quan es recupera el servei">↻ Gira</button>${prev?`<button class="btn" id="aCopy">Copia el set ${n-1}</button>`:''}<button class="btn" id="aClear">Buida</button></div>
+    </div>
     <div class="agrid">
       <label class="flabel">Serveix primer<select class="inp" id="aS"><option value="nos" ${servDefault==='nos'?'selected':''}>${esc(S.meta.equip)}</option><option value="ells" ${servDefault==='ells'?'selected':''}>${esc(S.meta.rival)}</option></select></label>
       <label class="flabel">Rotació inicial del rival<select class="inp" id="aRR"><option value="">No la segueixo</option>${[1,2,3,4,5,6].map(r=>`<option value="${r}" ${a.rivRot===r?'selected':''}>R${r}</option>`).join('')}</select></label>
+      <div class="flabel">Control del lliure<div class="seg" id="aMode"><button type="button" data-m="auto">Auto</button><button type="button" data-m="manual">Manual</button></div></div>
     </div>
-    <b style="margin-top:4px">Lliure</b>
-    <div class="agrid">
-      <label class="flabel">Lliure 1<select class="inp" id="aL">${optList(roster,lib1)}</select></label>
-      <label class="flabel">Lliure 2<select class="inp" id="aL2">${optList(roster,lib2)}</select></label>
-      <div class="flabel">Control<div class="seg" id="aMode"><button type="button" data-m="auto" class="${mode==='auto'?'on':''}">Auto</button><button type="button" data-m="manual" class="${mode==='manual'?'on':''}">Manual</button></div></div>
-    </div>
-    <div class="flabel" id="aPerWrap">Entra automàticament per<div class="checks" id="aPer"></div></div>
+    <div class="flabel" id="aPerWrap">El lliure entra automàticament per<div class="chips" id="aPer"></div></div>
     <div class="note" id="aModeNote"></div>
     <div class="row"><button class="btn pri" id="aSave">Desa i comença</button><button class="btn" id="aCancel">${auto?'Ara no':'Tanca'}</button></div>`;
-  let curMode=mode;
-  const readPos=()=>[0,1,2,3,4,5].map(i=>+$('#aP'+i).value||0);
-  const setPos=pos=>pos.forEach((v,i)=>$('#aP'+i).value=v||'');
-  const renderPer=()=>{const pos=readPos().filter(Boolean);const cur=[...document.querySelectorAll('#aPer input:checked')].map(x=>+x.value);
-    const chosen=cur.length||$('#aPer').dataset.init?cur:per;$('#aPer').dataset.init='1';
-    $('#aPer').innerHTML=pos.map(n=>`<label><input type="checkbox" value="${n}" ${chosen.includes(n)?'checked':''}> ${n} ${esc(first(n))}</label>`).join('')||'<span class="note">Omple primer les posicions.</span>'};
-  const upd=()=>{const pos=readPos();const r=pos.every(Boolean)?rotOf(pos):null;$('#aRot').textContent=r?'R'+r:'–';
-    $('#aPerWrap').hidden=curMode!=='auto';
-    $('#aModeNote').textContent=curMode==='auto'?"El lliure entra sol a la zona de defensa pels jugadors marcats (normalment els centrals) i surt quan arriben a la xarxa o els toca servir.":"El lliure només entra i surt quan ho indiques amb el botó Lliure. Surt sol si el jugador que cobreix arriba a la xarxa."};
-  renderPer();upd();
-  for(let i=0;i<6;i++)$('#aP'+i).onchange=()=>{renderPer();upd()};
-  $('#aRotF').onclick=()=>{const p=readPos();setPos(p.slice(1).concat(p[0]));upd()};
-  $('#aRotB').onclick=()=>{const p=readPos();setPos([p[5]].concat(p.slice(0,5)));upd()};
-  if(prev)$('#aCopy').onclick=()=>{setPos(prev.pos);$('#aL').value=prev.lib||'';$('#aL2').value=prev.lib2||'';$('#aPer').dataset.init='';$('#aPer').innerHTML='';renderPer();upd()};
-  $('#aMode').onclick=e=>{const b=e.target.closest('button');if(!b)return;curMode=b.dataset.m;[...$('#aMode').children].forEach(x=>x.classList.toggle('on',x===b));upd()};
+  const slotLabel=i=>i<6?'P'+(i+1):'L'+(i-5);
+  const get=i=>i<6?E.pos[i]:E.lib[i-6];
+  const set=(i,v)=>{if(i<6)E.pos[i]=v;else E.lib[i-6]=v};
+  const draw=()=>{
+    const cell=i=>{const v=get(i),on=E.sel===i,isL=i>=6;
+      return `<button type="button" class="acell ${on?'on':''} ${v?'':'empty'} ${isL?'libc':''}" data-ap="${i}">
+        <span class="pp">${slotLabel(i)}${i===0?' · serveix':''}${v&&isSetter(v)?' · Col':''}</span>
+        <b class="num">${v||'+'}</b><small>${v?esc(first(v)):isL?'Lliure (opcional)':'Tria'}</small></button>`};
+    $('#aCourt').innerHTML=`<div class="anet">XARXA</div><div class="agrid3">${[3,2,1,4,5,0].map(cell).join('')}</div><div class="agrid2">${cell(6)}${cell(7)}</div>`;
+    const where=num=>{const i=E.pos.indexOf(num);if(i>=0)return 'P'+(i+1);const l=E.lib.indexOf(num);return l>=0?'L'+(l+1):''};
+    $('#aRoster').innerHTML=roster.map(j=>{const w=where(j.num);
+      return `<button type="button" class="chip ${w?'used':''}" data-aj="${j.num}" title="${esc(j.nom)}">${j.num}<small>${esc(first(j.num))}${j.pos?' · '+esc(j.pos):''}</small>${w?`<em>${w}</em>`:''}</button>`}).join('');
+    const full=E.pos.every(Boolean);const r=full?rotOf(E.pos):null;
+    [...$('#aRots').children].forEach(b=>b.classList.toggle('on',r===+b.dataset.ar));
+    const onCourt=E.pos.filter(Boolean);E.per=E.per.filter(x=>onCourt.includes(x));if(!E.perTouched&&!E.per.length)E.per=defaultLibPer(onCourt);
+    $('#aPer').innerHTML=onCourt.map(x=>`<button type="button" class="chip ${E.per.includes(x)?'on':''}" data-aper="${x}">${x}<small>${esc(first(x))}</small></button>`).join('')||'<span class="note">Omple primer les posicions.</span>';
+    [...$('#aMode').children].forEach(b=>b.classList.toggle('on',b.dataset.m===E.mode));
+    const anyLib=E.lib.some(Boolean);
+    $('#aPerWrap').hidden=E.mode!=='auto'||!anyLib;
+    $('#aModeNote').textContent=!anyLib?'Sense lliure en aquest set.':E.mode==='auto'?"El lliure entra sol a la zona de defensa pels jugadors marcats (normalment els centrals) i surt quan arriben a la xarxa o els toca servir.":"El lliure només entra i surt quan ho indiques amb el botó Lliure.";
+  };
+  const nextEmpty=from=>{for(let k=1;k<=8;k++){const i=(from+k)%8;if(i<6&&!get(i))return i}return null};
+  box.onclick=e=>{const b=e.target.closest('button');if(!b)return;const d=b.dataset;
+    if(d.ap!=null){const i=+d.ap;E.sel=E.sel===i?null:i;draw()}
+    else if(d.aj!=null){const num=+d.aj;
+      if(E.sel==null){E.sel=nextEmpty(-1);if(E.sel==null)return toast('Toca primer la posició que vols canviar')}
+      const i=E.sel,cur=get(i);
+      if(cur===num){set(i,null);draw();return}
+      // si ja era en una altra posició, intercanvia
+      for(let k=0;k<8;k++)if(k!==i&&get(k)===num)set(k,cur||null);
+      set(i,num);E.sel=i<6?nextEmpty(i):null;draw()}
+    else if(d.ar!=null){const target=+d.ar;if(!E.pos.every(Boolean))return toast('Omple primer les sis posicions');
+      if(!E.pos.some(isSetter))return toast("Marca el col·locador a la plantilla (posició Col)");
+      for(let k=0;k<6&&rotOf(E.pos)!==target;k++)E.pos=E.pos.slice(1).concat(E.pos[0]);draw()}
+    else if(d.aper!=null){const x=+d.aper;E.perTouched=true;E.per=E.per.includes(x)?E.per.filter(y=>y!==x):E.per.concat(x);draw()}
+    else if(d.m){E.mode=d.m;draw()}
+  };
+  $('#aRotF').onclick=()=>{E.pos=E.pos.slice(1).concat(E.pos[0]);draw()};
+  $('#aRotB').onclick=()=>{E.pos=[E.pos[5]].concat(E.pos.slice(0,5));draw()};
+  if(prev)$('#aCopy').onclick=()=>{E.pos=prev.pos.slice();E.lib=[prev.lib||null,prev.lib2||null];E.per=(prev.libPer||[]).slice();E.mode=prev.libMode||'auto';E.sel=null;draw()};
+  $('#aClear').onclick=()=>{E.pos=[null,null,null,null,null,null];E.lib=[null,null];E.per=[];E.sel=0;draw()};
   $('#aSetN').onchange=e=>openAlin(+e.target.value);
   $('#aCancel').onclick=()=>{ui.dismissed[n]=true;closeBoxes()};
   $('#aSave').onclick=()=>{
-    const pos=readPos();
+    const pos=E.pos.map(x=>x||0);
     if(!pos.every(Boolean))return toast('Omple les sis posicions');
     if(new Set(pos).size!==6)return toast('Hi ha un dorsal repetit');
-    const lib=+$('#aL').value||null,lib2=+$('#aL2').value||null;
+    const [lib,lib2]=E.lib;
     if((lib&&pos.includes(lib))||(lib2&&pos.includes(lib2)))return toast('Un lliure no pot ser a les sis posicions');
-    if(lib&&lib===lib2)return toast('Els dos lliures han de ser diferents');
-    const libPer=[...document.querySelectorAll('#aPer input:checked')].map(x=>+x.value);
-    if(curMode==='auto'&&(lib||lib2)&&!libPer.length)return toast('Marca per qui entra el lliure');
-    S.alin[n]={pos,lib:lib||lib2,lib2:lib&&lib2?lib2:null,libPer,libMode:curMode,serv:$('#aS').value,rivRot:+$('#aRR').value||null};
-    S.meta.exemple=false;save();closeBoxes();render();toast(`Set ${n}: comença en R${rotOf(pos)||'?'}`);
+    if(E.mode==='auto'&&(lib||lib2)&&!E.per.length)return toast('Marca per qui entra el lliure');
+    S.alin[n]={pos,lib:lib||lib2||null,lib2:lib&&lib2?lib2:null,libPer:E.per.slice(),libMode:E.mode,serv:$('#aS').value,rivRot:+$('#aRR').value||null};
+    S.meta.exemple=false;save();closeBoxes();render();const r=rotOf(pos);toast(`Set ${n} desat${r?`: comença en R${r}`:''}`);
   };
+  draw();
 }
 function openCanvi(){
   const {st}=replay();
@@ -712,7 +755,9 @@ function filtered(der){return fSet==='tots'?der:der.filter(e=>e.c.set===+fSet)}
 function jname(n){const j=S.jug.find(x=>x.num===n);return j?j.nom:'Dorsal '+n}
 
 const TABS=[['reg','Registre'],['fon','Fonaments'],['jug','Jugadors'],['rot','Rotacions i sets'],['zon','Zones'],['inf','Informe'],['rev','Revisió auto'],['cfg','Partit']];
+let lastTab=null;
 function renderView(){
+  const rl=$('#revList');const keepScroll=(lastTab==='rev'&&tab==='rev'&&rl&&rl.isConnected)?rl.scrollTop:null;lastTab=tab;
   $('#tabs').innerHTML=TABS.map(([k,l])=>`<button class="tab ${tab===k?'on':''}" data-tab="${k}">${l}</button>`).join('');
   $('#filters').hidden=(tab==='cfg'||tab==='reg'||tab==='inf'||tab==='rev');
   const {der,st}=replay();
@@ -727,7 +772,9 @@ function renderView(){
   else if(tab==='inf'){v.innerHTML=viewInf(der,st);bindInf(der,st)}
   else if(tab==='rot')v.innerHTML=viewRot(PT,st);
   else if(tab==='zon')v.innerHTML=viewZon(A);
-  else if(tab==='rev'){v.innerHTML=viewRev();bindRev()}
+  else if(tab==='rev'){v.innerHTML=viewRev();bindRev();const nl=$('#revList');
+    if(nl){if(keepScroll!=null)nl.scrollTop=keepScroll;
+      const mark=()=>{revManual=Date.now()};nl.addEventListener('wheel',mark,{passive:true});nl.addEventListener('touchmove',mark,{passive:true});nl.addEventListener('pointerdown',mark)}}
   else v.innerHTML=viewCfg();
   if(tab==='zon')bindZon();
   if(tab==='cfg')bindCfg();

@@ -69,7 +69,8 @@ button{cursor:pointer}
 .main{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:14px;align-items:start}
 @media (max-width:980px){.main{grid-template-columns:minmax(0,1fr)}}
 /* El vídeo sempre a la vista: a l'ordinador, la columna esquerra es queda fixa */
-@media (min-width:981px){.main>section:first-child{position:sticky;top:calc(env(safe-area-inset-top,0px) + 8px);max-height:calc(100vh - 16px);overflow:auto}}
+@media (min-width:981px){.main>section:first-child{position:sticky;top:calc(env(safe-area-inset-top,0px) + 8px);max-height:calc(100vh - 16px);overflow:auto;grid-auto-rows:max-content;align-content:start}}
+.video{flex-shrink:0}
 @media (min-width:981px){.revmode .video{position:sticky;top:0;z-index:3}}
 /* Al mòbil, durant la revisió, el vídeo passa a ser un reproductor petit fix */
 @media (max-width:980px){.revmode .video{position:fixed;right:8px;bottom:calc(8px + env(safe-area-inset-bottom,0px));width:min(52vw,340px);z-index:15;box-shadow:0 6px 24px rgba(0,0,0,.35);border:1px solid var(--line)}}
@@ -528,7 +529,7 @@ function revFollow(){
 setInterval(()=>{revFollow();$('#clockT').textContent=fmt(curTime());const l=$('#ytOpen');l.href=ytLink(curTime());l.style.visibility=S.meta.videoId?'visible':'hidden'},250);
 $('#vidFile').onchange=e=>{const f=e.target.files[0];if(!f)return;if(vfileURL)URL.revokeObjectURL(vfileURL);
   vfileURL=URL.createObjectURL(f);const v=$('#vfile');v.src=vfileURL;$('#vidName').textContent=f.name;$('#vidClose').hidden=false;
-  if(canEdit()&&S.meta.fitxer!==f.name){S.meta.fitxer=f.name;save()}setMode('file');toast('Vídeo obert: '+f.name)};
+  if(canEdit()&&S.meta.fitxer!==f.name){S.meta.fitxer=f.name;save()}setMode('file');if(tab==='rev')renderView();toast('Vídeo obert: '+f.name)};
 $('#vidClose').onclick=()=>{const v=$('#vfile');v.pause();v.removeAttribute('src');v.load();if(vfileURL)URL.revokeObjectURL(vfileURL);vfileURL=null;
   $('#vidName').textContent='';$('#vidClose').hidden=true;$('#vidFile').value='';mode='clock';ytReady?makePlayer():setMode('clock')};
 $('#clkPlay').onclick=()=>{if(clk.run){clk.base=curTime();clk.run=false}else{clk.start=Date.now();clk.run=true}$('#clkPlay').textContent=clk.run?'❚❚ Pausa':'▶ Reprodueix'};
@@ -900,8 +901,8 @@ function revRows(){
 function viewRev(){
   if(!S.auto)return `<h3 style="font-size:18px;margin-bottom:6px">Revisió de l'anàlisi automàtica</h3>
     <p class="note" style="max-width:65ch">L'analitzador del PC detecta les jugades d'un vídeo i proposa qui guanya cada punt. Aquí importes el resultat, el revises amb el vídeo i l'apliques al partit. Cada correcció serveix perquè l'analitzador aprengui.</p>
-    <ol class="note" style="max-width:65ch;padding-left:18px"><li>Al PC: <code>python vidia_analitza.py calibra VIDEO.mp4</code> i després <code>analitza VIDEO.mp4</code>.</li><li>Aquí: obre el mateix fitxer de vídeo (a sota del vídeo) i importa el fitxer <code>.analisi.json</code>.</li></ol>
-    <div class="row edit"><label class="btn pri" style="cursor:pointer">Importa l'anàlisi<input type="file" id="revImp" accept=".json,application/json" hidden></label></div>`;
+    <ol class="note" style="max-width:65ch;padding-left:18px"><li>Al PC: <code>python vidia_analitza.py calibra VIDEO.mp4</code> i després <code>analitza VIDEO.mp4</code>.</li><li>Aquí: obre el mateix fitxer de vídeo i importa el fitxer <code>.analisi.json</code>.</li></ol>
+    <div class="row edit"><label class="btn" for="vidFile" style="cursor:pointer">${mode==='file'?'Canvia el vídeo':'Obre el vídeo (MP4)'}</label><label class="btn pri" style="cursor:pointer">Importa l'anàlisi<input type="file" id="revImp" accept=".json,application/json" hidden></label></div>`;
   const A=S.auto,R=revRows();
   const rows=A.jugades.slice().sort((a,b)=>a.inici-b.inici);
   const nRev=rows.filter(j=>j.revisada).length,nDesc=rows.filter(j=>j.descartada).length;
@@ -917,7 +918,7 @@ function viewRev(){
   const nf=S.meta.fitxer&&A.video&&A.video.nom&&S.meta.fitxer!==A.video.nom;
   return `<div class="row" style="justify-content:space-between"><h3 style="font-size:18px">Revisió · ${esc(A.video?A.video.nom:'')}</h3><span class="note">${rows.length} jugades · ${nRev} revisades · ${nDesc} descartades</span></div>
     ${nf?`<div class="warn">El vídeo obert (${esc(S.meta.fitxer)}) no és el de l'anàlisi.</div>`:''}
-    ${mode!=='file'?`<div class="warn">Obre el fitxer de vídeo a sota del reproductor per poder mirar cada jugada.</div>`:''}
+    ${mode!=='file'?`<div class="warn row" style="justify-content:space-between">Obre el fitxer de vídeo del partit per poder mirar cada jugada.<label class="btn pri" for="vidFile" style="cursor:pointer">Obre el vídeo (MP4)</label></div>`:''}
     <div class="ugrid edit">
       <label class="flabel">Al camp proper a l'inici<select class="inp" id="revProp"><option value="nos" ${A.cfg.prop==='nos'?'selected':''}>${esc(S.meta.equip)}</option><option value="ells" ${A.cfg.prop==='ells'?'selected':''}>${esc(S.meta.rival)}</option></select></label>
       <label class="flabel">Set a l'inici<input class="inp num" id="revSet" type="number" min="1" max="5" value="${A.cfg.set}"></label>

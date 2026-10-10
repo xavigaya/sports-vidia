@@ -7,7 +7,28 @@ Programa per al PC que llegeix el vídeo d'un partit (càmera fixa darrere el fo
 2. Ves a aquesta carpeta, per exemple: `cd C:\Users\xavi\sports-vidia\analitzador`
 3. Instal·la les dependències: `py -m pip install -r requirements.txt`
 
-## Ús per a cada vídeo
+## Mode local (recomanat)
+Una sola ordre obre l'app connectada a la carpeta on tens els vídeos dels partits:
+
+`py vidia_analitza.py inicia "C:\Videos\Partits"`
+
+S'obre el navegador a `http://localhost:8765`. A la pestanya **Revisió auto** veuràs els vídeos de la carpeta. Per a cada vídeo:
+1. **Calibra la pista**: clica els 7 punts sobre la imatge (4 cantonades i el punt mig de tres línies). Si la càmera no s'ha mogut, tria **Copia el calibratge de…** un altre vídeo.
+2. **Analitza**: es fa en segon pla; pots continuar treballant. La barra mostra el progrés.
+3. **Revisa**: s'obre un partit amb el vídeo i les jugades ja carregats. Revisa primer les **dubtoses** i després prem **Accepta les segures**.
+4. **Desa i aprèn**: les correccions es guarden i l'analitzador aprèn sol. A la mateixa pantalla veus l'estat de l'aprenentatge i dels criteris per passar a la fase 2.
+
+No cal moure cap fitxer `.json` ni escriure més ordres. Per aturar el servidor, prem `Ctrl+C` a la finestra de PowerShell.
+
+Coses a saber:
+- El servidor només és accessible des d'aquest ordinador.
+- L'app en mode local (`localhost`) té els seus propis usuaris i partits, separats dels de GitHub Pages: el primer cop hauràs de crear l'administrador.
+- Fes servir Chrome o Edge (llegeixen bé els MP4).
+
+**Jugades dubtoses**: les que no tenen proposta de guanyador, tenen poca confiança, tanquen un set o tenen una durada estranya, i una de cada deu de les segures triada a l'atzar (control). Les segures que acceptes sense mirar no compten per mesurar l'encert del guanyador; les dubtoses que revises, sí.
+
+## Ús manual, per ordres
+
 1. **Calibra la pista**: `py vidia_analitza.py calibra "C:\Videos\partit.mp4"`
    S'obre una imatge del vídeo. Clica, per aquest ordre:
    - les 4 cantonades de la pista de vòlei: propera esquerra, propera dreta, llunyana dreta i llunyana esquerra;

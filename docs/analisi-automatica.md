@@ -1,6 +1,6 @@
 # Anàlisi automàtica del vídeo — pla
 
-Estat: **fase 1 en funcionament (analitzador 0.2)**. Provada amb dos clips de 5 minuts (Curt-hospi_1 i _2).
+Estat: **fase 1 en funcionament (analitzador 0.3, amb mode local)**. Provada amb dos clips de 5 minuts (Curt-hospi_1 i _2).
 
 ## Decisions preses
 - Vídeos: propis i d'altres. L'anàlisi automàtica es fa amb **vídeos propis** (fitxer MP4 original o descarregat des de YouTube Studio). Els vídeos d'altres canals es continuen analitzant amb el registre manual, tret que en tinguem el fitxer amb permís.
@@ -46,6 +46,9 @@ Estat: **fase 1 en funcionament (analitzador 0.2)**. Provada amb dos clips de 5 
 
 ## PC de l'usuari
 - NVIDIA GeForce RTX 3070 Laptop, Python 3.13.7.
+
+## Flux de treball (mode local)
+`py vidia_analitza.py inicia CARPETA` obre l'app connectada a la carpeta de vídeos: calibratge clicant al navegador, anàlisi en segon pla, revisió amb el vídeo carregat sol i botó **Desa i aprèn**. La revisió mostra primer les jugades dubtoses (sense proposta, confiança < 75 %, fi de set, durada < 2 s o > 45 s) i un 10 % de controls a l'atzar; la resta s'accepta amb un clic. Les acceptades sense revisar no compten per mesurar el guanyador.
 
 ## Què s'aprèn a la fase 1
 - Tres llindars de detecció (xiulet, servidor proper, pujada de moviment), amb totes les jugades revisades.

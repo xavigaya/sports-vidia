@@ -16,6 +16,8 @@ El guanyador de cada punt es dedueix del costat que serveix la jugada següent.
   python vidia_analitza.py estat                       -> conjunt, historial i criteris de canvi de fase
   python vidia_analitza.py apren                       -> torna a ajustar amb tot el conjunt
   python vidia_analitza.py oblida NOM_VIDEO            -> treu un partit del conjunt
+  python vidia_analitza.py inicia CARPETA              -> mode local: obre l'app connectada a la carpeta
+                                                         de vídeos (calibra, analitza, revisa i aprèn)
 
 Requisits: Python 3.10+, numpy, scipy, opencv-python, imageio-ffmpeg (veure requirements.txt).
 """
@@ -24,7 +26,7 @@ from pathlib import Path
 
 import numpy as np
 
-VERSIO = "0.2.0"
+VERSIO = "0.3.0"
 AQUI = Path(__file__).resolve().parent
 PARAMS_FILE = AQUI / "parametres.json"
 
@@ -318,10 +320,22 @@ def troba_xiulets(score, hop, params):
     return [{"t": round(float(i * hop), 2), "forca": round(float(score[i]), 2)} for i in pk]
 
 
+PROGRES = None   # funció opcional f(fracció) per informar del progrés (la fa servir el servidor local)
+
+
+def _progres(x):
+    if PROGRES:
+        try:
+            PROGRES(max(0.0, min(1.0, float(x))))
+        except Exception:
+            pass
+
+
 def senyals_video(video, cal, params):
     """Recorre el vídeo a baixa resolució i calcula moviment i presència a les zones de servei."""
     W = params["amplada_analisi"]
     info = video_info(video)
+    total_fr = max(1, int(info["durada"] * params["fps_analisi"]))
     H = int(round(W * info["alcada"] / info["amplada"] / 2) * 2)
     fps = params["fps_analisi"]
     pista, prop, lluny = zones(cal, W, H)
@@ -351,6 +365,8 @@ def senyals_video(video, cal, params):
         far.append(fg[mF].mean())
         prev = g
         k += 1
+        if k % (fps * 5) == 0:
+            _progres(0.05 + 0.95 * k / total_fr)
         if k % (fps * 60) == 0:
             print(f"  … {k / fps / 60:.0f} min analitzats ({time.time() - t0:.0f} s)", flush=True)
     proc.wait()
@@ -476,6 +492,9 @@ def analitza(video, params=None, cal=None, quiet=False, cache=None):
         mov, near, far, fps = senyals_video(video, cal, params)
         if cache is not None:
             cache["senyals"] = (score, hop, mov, near, far, fps); cache["f0"] = f0
+        else:
+            desa_senyals(video, {"score": score, "hop": hop, "f0": f0 or 0.0, "mov": mov, "near": near,
+                                 "far": far, "fps": fps, "durada": info["durada"]})
 
     xiulets = troba_xiulets(score, hop, params)
     if not quiet: print("3/3 Detectant jugades…", flush=True)
@@ -522,6 +541,26 @@ def _slug(nom):
     return "".join(c if c.isalnum() or c in "-_." else "_" for c in nom)
 
 
+def _npz_de(video):
+    return APR / f"{_slug(Path(video).name)}.senyals.npz"
+
+
+def desa_senyals(video, sig):
+    """Guarda els senyals calculats perquè avalua no hagi de tornar a llegir el vídeo."""
+    try:
+        APR.mkdir(exist_ok=True)
+        np.savez_compressed(_npz_de(video), **{k: np.asarray(v) for k, v in sig.items()})
+    except Exception as e:
+        print(f"  Avís: no s'han pogut desar els senyals ({e})")
+
+
+def oblida_senyals(video):
+    try:
+        _npz_de(video).unlink()
+    except FileNotFoundError:
+        pass
+
+
 def calcula_senyals(video, cal, params):
     info = video_info(video)
     print("  · so (xiulets)…", flush=True)
@@ -550,13 +589,15 @@ def compara(det, etiquetes):
             dd = abs(d["inici"] - v["inici"])
             if dd <= bd:
                 best, bd = k, dd
-        if v.get("guanya_costat"):
+        # el guanyador només compta si s'ha revisat a mà (no si s'ha acceptat la proposta sense mirar-la)
+        manual = v.get("revisada", True)
+        if v.get("guanya_costat") and manual:
             amb_g += 1
         if best is None:
             continue
         d = det[best]
         usades.add(best); trobades += 1
-        if v.get("guanya_costat") and d.get("guanya_costat") == v["guanya_costat"]:
+        if v.get("guanya_costat") and manual and d.get("guanya_costat") == v["guanya_costat"]:
             enc_g += 1
         if v.get("costat_servei") and (v.get("costat_corregit") or v.get("revisada")):
             amb_srv += 1
@@ -702,6 +743,31 @@ def apren(motiu="aprenentatge", verbose=True):
     return tot1
 
 
+def estat_dict():
+    """Estat dels criteris de canvi de fase, en forma de dades (per a l'app)."""
+    hist = _jread(HIST, [])
+    idx = _jread(INDEX, [])
+    if not hist:
+        return {"partits": len(idx), "criteris": [], "llest": False, "ultim": None}
+    h = hist[-1]; d = h["despres"]; C = CRITERIS
+    estables = 0
+    for x in reversed(hist):
+        if x.get("motiu") != "partit nou" or x.get("partits", 0) < 2:
+            continue
+        if x["canvi_parametres"]:
+            break
+        estables += 1
+    cr = [
+        {"text": f"Partits sencers revisats: {h['partits_sencers']} de {C['partits_sencers']}", "ok": h["partits_sencers"] >= C["partits_sencers"]},
+        {"text": f"Jugades trobades: {d['pct_trobades']:.0%} (cal ≥ {C['trobades']:.0%})", "ok": d["pct_trobades"] >= C["trobades"]},
+        {"text": f"Jugades falses: {d['pct_falses']:.0%} (cal ≤ {C['falses']:.0%})", "ok": d["pct_falses"] <= C["falses"]},
+        {"text": f"Guanyador encertat: {d['pct_guanyador']:.0%} (cal ≥ {C['guanyador']:.0%})", "ok": d["pct_guanyador"] >= C["guanyador"]},
+        {"text": f"Partits nous seguits sense canviar paràmetres: {estables} de {C['sense_canvis']}", "ok": estables >= C["sense_canvis"]},
+    ]
+    return {"partits": len(idx), "criteris": cr, "llest": all(c["ok"] for c in cr), "ultim": h,
+            "resum": _fmt_tot(d)}
+
+
 def estat_fase():
     hist = _jread(HIST, [])
     if not hist:
@@ -710,7 +776,7 @@ def estat_fase():
     h = hist[-1]; d = h["despres"]; C = CRITERIS
     estables = 0
     for x in reversed(hist):
-        if x.get("motiu") != "partit nou":
+        if x.get("motiu") != "partit nou" or x.get("partits", 0) < 2:
             continue
         if x["canvi_parametres"]:
             break
@@ -748,7 +814,7 @@ def avalua(video, etiquetes_path, refresca=False):
     e = next((x for x in idx if x["nom"] == nom), None)
     npz = APR / f"{sl}.senyals.npz"
     nou = e is None
-    if nou or refresca or not npz.exists():
+    if refresca or not npz.exists():
         print(f"Calculant els senyals de {nom} (només cal fer-ho un cop)…", flush=True)
         sig = calcula_senyals(video, _jread(cp, {}), load_params())
         np.savez_compressed(npz, **{k: np.asarray(v) for k, v in sig.items()})
@@ -822,6 +888,10 @@ def main():
     e.add_argument("--refresca", action="store_true", help="torna a calcular els senyals del vídeo")
     sub.add_parser("apren", help="torna a ajustar els paràmetres amb tot el conjunt")
     sub.add_parser("estat", help="mostra el conjunt, l'historial i els criteris de canvi de fase")
+    i = sub.add_parser("inicia", help="obre l'app connectada a una carpeta de vídeos (mode local)")
+    i.add_argument("carpeta", help="carpeta on hi ha els vídeos dels partits")
+    i.add_argument("--port", type=int, default=8765)
+    i.add_argument("--no-obris", action="store_true", help="no obris el navegador automàticament")
     o = sub.add_parser("oblida", help="treu un partit del conjunt d'aprenentatge")
     o.add_argument("nom", help="nom del fitxer de vídeo, tal com surt a estat")
     args = ap.parse_args()
@@ -840,6 +910,9 @@ def main():
         mostra_estat()
     elif args.ordre == "oblida":
         oblida(args.nom)
+    elif args.ordre == "inicia":
+        import servidor
+        servidor.inicia(args.carpeta, args.port, not args.no_obris)
 
 
 if __name__ == "__main__":

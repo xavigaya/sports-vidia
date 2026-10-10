@@ -1,5 +1,5 @@
 // Service worker de Sports VidIA Vòlei
-const VERSION = 'vidia-v8';
+const VERSION = 'vidia-v9';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png',
   'icons/apple-touch-icon.png', 'icons/favicon-32.png'];
@@ -18,6 +18,8 @@ self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
+  // Mode local: les dades i els vídeos del servidor del PC no es guarden mai a la memòria cau
+  if (url.origin === location.origin && url.pathname.startsWith('/api/')) return;
 
   // Pàgina: primer la xarxa (per rebre actualitzacions), si no hi ha connexió, la còpia desada
   if (req.mode === 'navigate') {

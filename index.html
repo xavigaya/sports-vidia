@@ -77,6 +77,27 @@ button{cursor:pointer}
 .rtime{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;margin-top:5px;font-size:12px;color:var(--muted)}
 .rtime b{color:var(--ink);font-weight:600}.rtime b.adj{color:var(--blue)}
 .seg.sm button{padding:3px 8px;font-size:12px}
+.vlist{display:grid;border:1px solid var(--line);border-radius:8px;overflow:hidden;margin:8px 0 14px}
+.vrow{display:flex;flex-wrap:wrap;gap:8px 14px;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid var(--line)}
+.vrow:last-child{border-bottom:0}
+.vname{display:grid;gap:3px;min-width:0}.vname b{overflow-wrap:anywhere}
+.vacts{gap:6px}
+.vchip{font-size:11px;font-weight:600;border:1px solid var(--line);border-radius:999px;padding:1px 8px;color:var(--muted)}
+.vchip.ok{border-color:var(--good);color:var(--good)}
+.pbar{display:inline-block;width:120px;height:8px;border-radius:4px;background:var(--court);overflow:hidden;vertical-align:middle}
+.pbar i{display:block;height:100%;background:var(--blue)}
+.fase{border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.fase ul{list-style:none;padding:0;margin:8px 0;display:grid;gap:3px;font-size:14px}
+.fase li{color:var(--muted)}.fase li.ok{color:var(--good)}
+.why{font-size:11px;font-weight:600;color:var(--bad);border:1px solid color-mix(in srgb,var(--bad) 40%,transparent);border-radius:999px;padding:0 6px}
+.revlist .li.dub{box-shadow:inset 3px 0 0 var(--ball)}
+.calstep{margin:6px 0;font-size:15px}
+.calwrap{position:relative;max-width:100%;cursor:crosshair;user-select:none;border-radius:8px;overflow:hidden;border:1px solid var(--line)}
+.calimg{display:block;width:100%;height:auto;max-width:100%}
+.calsvg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.calsvg .cpt{fill:#ffd400;stroke:#000;stroke-width:2}
+.calsvg .cnum{fill:#ffd400;stroke:#000;stroke-width:3;paint-order:stroke;font:700 28px var(--f-body)}
+.calsvg .cline{fill:none;stroke:#ffd400;stroke-width:3}
 .revlist{max-height:min(62vh,640px);overflow:auto;border:1px solid var(--line);border-radius:8px}
 .revlist .li.now{background:color-mix(in srgb,var(--ball) 22%,var(--surface))}
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;display:grid;gap:12px;min-width:0}
@@ -902,30 +923,186 @@ function revRows(){
   });
   return out;
 }
+/* ---------- Mode local (analitzador del PC) ---------- */
+let LOCAL=null,localShow=false,calib=null,localPoll=null,localPrev={};
+const encV=n=>encodeURIComponent(n);
+async function localFetch(){
+  try{const r=await fetch('api/estat',{cache:'no-store'});if(!r.ok)throw 0;const d=await r.json();if(d.app!=='sports-vidia-local')throw 0;return d}catch(e){return null}
+}
+async function localInit(){
+  LOCAL=await localFetch();if(!LOCAL)return;
+  clearInterval(localPoll);localPoll=setInterval(localTick,2500);
+  if(tab==='rev')renderView();
+}
+async function localTick(){
+  if(!ME)return;
+  const busy=LOCAL&&LOCAL.videos.some(v=>v.feina&&/cua|curs/.test(v.feina.estat));
+  if(!busy&&!(tab==='rev'&&view==='match'))return;
+  const d=await localFetch();if(!d)return;LOCAL=d;
+  for(const v of d.videos){const f=v.feina,p=localPrev[v.nom];
+    if(f&&f.estat!==(p&&p.estat)&&/fet|error/.test(f.estat)&&p){
+      toast(`${v.nom}: ${f.estat==='fet'?f.missatge:'error · '+f.missatge}`);
+      if(f.tipus==='analitza'&&f.estat==='fet'&&S.meta&&S.meta.local===v.nom&&!S.auto)loadLocalAnalysis(v.nom)}
+    localPrev[v.nom]=f?{estat:f.estat}:null}
+  const lp=$('#localPanel');if(lp&&lp.isConnected)lp.innerHTML=localPanelHTML();
+}
+function chip(ok,t){return `<span class="vchip ${ok?'ok':''}">${ok?'✓ ':''}${t}</span>`}
+function localPanelHTML(){
+  if(!LOCAL)return '';
+  const cal=LOCAL.videos.filter(v=>v.calibrat);
+  const rows=LOCAL.videos.map(v=>{const f=v.feina,run=f&&/cua|curs/.test(f.estat);
+    const acts=run?`<span class="note">${f.tipus==='analitza'?'Analitzant':'Aprenent'}… ${Math.round((f.progres||0)*100)}%</span><span class="pbar"><i style="width:${Math.round((f.progres||0)*100)}%"></i></span>`
+      :!v.calibrat?`<button class="btn pri" data-lact="calibra" data-lv="${esc(v.nom)}">Calibra la pista</button>${cal.length?`<select class="inp" data-lact-copy="${esc(v.nom)}" aria-label="Copia el calibratge"><option value="">Copia el calibratge de…</option>${cal.map(c=>`<option>${esc(c.nom)}</option>`).join('')}</select>`:''}`
+      :!v.analitzat?`<button class="btn pri" data-lact="analitza" data-lv="${esc(v.nom)}">Analitza</button><button class="btn" data-lact="calibra" data-lv="${esc(v.nom)}">Recalibra</button>`
+      :`<button class="btn pri" data-lact="revisa" data-lv="${esc(v.nom)}">Revisa</button><button class="btn" data-lact="calibra" data-lv="${esc(v.nom)}">Recalibra</button><button class="btn" data-lact="analitza" data-lv="${esc(v.nom)}">Torna a analitzar</button>`;
+    const err=f&&f.estat==='error'?`<div class="note" style="color:var(--bad)">${esc(f.missatge)}</div>`:'';
+    return `<div class="vrow"><div class="vname"><b>${esc(v.nom)}</b><span class="note">${v.durada?Math.round(v.durada/60)+' min':'?'} · ${v.mida_mb} MB</span>
+      <span class="row" style="gap:4px">${chip(v.calibrat,'calibrat')}${chip(v.analitzat,'analitzat')}${chip(v.al_conjunt,'après')}</span>${err}</div>
+      <div class="row vacts">${canEdit()?acts:''}</div></div>`}).join('')||'<p class="note">No hi ha cap vídeo a la carpeta.</p>';
+  const F=LOCAL.fase||{};
+  const crit=(F.criteris||[]).map(c=>`<li class="${c.ok?'ok':''}">${c.ok?'✓':'○'} ${esc(c.text)}</li>`).join('');
+  return `<div class="row" style="justify-content:space-between"><h3 style="font-size:18px">Vídeos de la carpeta</h3><span class="note" title="${esc(LOCAL.carpeta)}">Analitzador ${esc(LOCAL.versio)} · ${esc(LOCAL.carpeta.split(/[\\/]/).slice(-2).join('/'))}</span></div>
+    <div class="vlist">${rows}</div>
+    <div class="fase"><b>Aprenentatge</b> <span class="note">${F.partits||0} partit(s) al conjunt${F.resum?' · '+esc(F.resum):''}</span>
+      ${crit?`<ul>${crit}</ul><div class="note">${F.llest?'La fase 1 ha arribat al seu límit: es pot passar a la fase 2.':'Encara a la fase 1.'}</div>`:'<div class="note">Quan desis la primera revisió, aquí veuràs els criteris per passar a la fase 2.</div>'}</div>`;
+}
+async function localPost(path,nom,body){
+  const r=await fetch(`api/${path}?v=${encV(nom)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});
+  const d=await r.json().catch(()=>({error:'Resposta no vàlida'}));if(!r.ok)throw new Error(d.error||'Error');return d;
+}
+function attachLocalVideo(nom){
+  if(vfileURL&&vfileURL.startsWith('blob:'))URL.revokeObjectURL(vfileURL);
+  vfileURL='api/video?v='+encV(nom);const v=$('#vfile');v.src=vfileURL;$('#vidName').textContent=nom+' (carpeta)';$('#vidClose').hidden=false;setMode('file');
+}
+function loadAnalysis(a){
+  const {st}=replay();
+  S.auto={video:a.video,versio:a.versio,creat:a.creat,xiulet_hz:a.xiulet_hz,parametres:a.parametres,
+    cfg:{prop:'nos',set:st.set,nos:st.nos,ells:st.ells},
+    jugades:a.jugades.map((j,i)=>({...j,id:'a'+(i+1),guanya:null,descartada:false,revisada:false,afegida:false,inici0:j.inici,final0:j.final,costat0:j.costat_servei}))};
+}
+async function loadLocalAnalysis(nom,force){
+  const r=await fetch('api/analisi?v='+encV(nom),{cache:'no-store'});if(!r.ok)return toast('Aquest vídeo encara no està analitzat');
+  const a=await r.json();
+  if(S.auto&&S.auto.video&&S.auto.video.nom===nom&&!force){if(a.creat!==S.auto.creat){S.auto.novaAnalisi=a.creat}save();renderView();return}
+  loadAnalysis(a);save();renderView();toast(`${a.jugades.length} jugades carregades`);
+}
+async function openLocal(nom){
+  let m=sortedMatches().find(x=>x.meta.local===nom);
+  if(!m){m=empty();const base=S&&!S.meta.exemple&&S.jug.length?S:sortedMatches().find(x=>!x.meta.exemple&&x.jug.length);
+    if(base){m.jug=JSON.parse(JSON.stringify(base.jug));m.meta.equip=base.meta.equip}
+    m.meta.nom=nom.replace(/\.[^.]+$/,'');m.meta.local=nom;m.meta.fitxer=nom;addMatch(m)}
+  localShow=false;tab='rev';openMatch(m.id);attachLocalVideo(nom);await loadLocalAnalysis(nom);
+}
+document.addEventListener('change',async e=>{const s=e.target.closest&&e.target.closest('[data-lact-copy]');if(!s||!s.value)return;
+  try{await localPost('copia-calibratge',s.dataset.lactCopy,{de:s.value});toast('Calibratge copiat');LOCAL=await localFetch()||LOCAL;renderView()}catch(x){toast(x.message)}});
+document.addEventListener('click',async e=>{const b=e.target.closest&&e.target.closest('[data-lact]');if(!b||!LOCAL)return;const nom=b.dataset.lv;
+  try{
+    if(b.dataset.lact==='calibra'){calib={nom,t:30,punts:[],desat:false};renderView()}
+    else if(b.dataset.lact==='analitza'){await localPost('analitza',nom);localPrev[nom]={estat:'a la cua'};LOCAL=await localFetch()||LOCAL;toast('Anàlisi en marxa: pots continuar treballant');renderView()}
+    else if(b.dataset.lact==='revisa'){await openLocal(nom)}
+  }catch(x){toast(x.message)}});
+
+/* ---------- Calibratge al navegador ---------- */
+const CAL_PASSOS=["Cantonada PROPERA esquerra","Cantonada PROPERA dreta","Cantonada LLUNYANA dreta","Cantonada LLUNYANA esquerra",
+  "Punt MIG de la línia de fons PROPERA","Punt MIG de la banda DRETA","Punt MIG de la banda ESQUERRA"];
+function viewCalib(){
+  const c=calib,n=c.punts.length;
+  if(c.desat)return `<h3 style="font-size:18px">Calibratge desat · ${esc(c.nom)}</h3>
+    <p class="note">Comprova que la línia groga segueix la pista i que la zona verda cobreix l'espai de darrere la línia de fons propera. Correcció de lent: k = ${c.k}.</p>
+    <img class="calimg" src="api/previsualitza?v=${encV(c.nom)}&r=${Date.now()}" alt="Comprovació del calibratge">
+    <div class="row" style="margin-top:10px"><button class="btn pri" id="cbAnal">Analitza ara</button><button class="btn" id="cbAgain">Torna a calibrar</button><button class="btn" id="cbBack">Torna a la llista</button></div>`;
+  const pts=c.punts.map((p,i)=>`<circle cx="${p[0]*1000}" cy="${p[1]*1000}" r="9" class="cpt"/><text x="${p[0]*1000+12}" y="${p[1]*1000-10}" class="cnum">${i+1}</text>`).join('');
+  const poly=n>=2?`<polyline points="${c.punts.slice(0,4).map(p=>p[0]*1000+','+p[1]*1000).join(' ')}${n>=4?' '+c.punts[0][0]*1000+','+c.punts[0][1]*1000:''}" class="cline"/>`:'';
+  return `<div class="row" style="justify-content:space-between"><h3 style="font-size:18px">Calibra la pista · ${esc(c.nom)}</h3><button class="btn" id="cbBack">Cancel·la</button></div>
+    <div class="calstep">${n<7?`<b>${n+1}/7</b> Clica: ${CAL_PASSOS[n]}`:'<b>Fet.</b> Desa el calibratge.'}</div>
+    <div class="calwrap" id="calWrap"><img class="calimg" id="calImg" src="api/fotograma?v=${encV(c.nom)}&t=${c.t}" alt="Fotograma del vídeo">
+      <svg viewBox="0 0 1000 1000" preserveAspectRatio="none" class="calsvg">${poly}${pts}</svg></div>
+    <div class="row" style="margin-top:8px">
+      <span class="note">Fotograma al segon</span><button class="mini" data-cbt="-30">−30</button><input class="inp num" id="cbT" type="number" min="0" value="${c.t}" style="width:80px"><button class="mini" data-cbt="30">+30</button>
+      <span class="note">Tria un moment amb poca gent sobre les línies.</span></div>
+    <div class="row" style="margin-top:8px"><button class="btn" id="cbUndo" ${n?'':'disabled'}>Desfés l'últim punt</button>
+      <button class="btn pri" id="cbSave" ${n===7?'':'disabled'}>Desa el calibratge</button>
+      <button class="btn" id="cbSave4" ${n>=4&&n<7?'':'hidden'}>Desa sense corregir la lent</button></div>
+    <p class="note" style="max-width:65ch">Els punts 5 a 7 serveixen per corregir la deformació de la lent (ull de peix): clica el punt de la línia que queda just al mig entre les dues cantonades.</p>`;
+}
+function bindCalib(){
+  const c=calib;
+  const back=$('#cbBack');if(back)back.onclick=()=>{calib=null;localShow=true;renderView()};
+  if(c.desat){$('#cbAgain').onclick=()=>{calib={nom:c.nom,t:c.t,punts:[],desat:false};renderView()};
+    $('#cbAnal').onclick=async()=>{try{await localPost('analitza',c.nom);localPrev[c.nom]={estat:'a la cua'};calib=null;localShow=true;LOCAL=await localFetch()||LOCAL;renderView();toast('Anàlisi en marxa')}catch(x){toast(x.message)}};return}
+  const img=$('#calImg');
+  $('#calWrap').onclick=e=>{if(c.punts.length>=7)return;const r=img.getBoundingClientRect();
+    const x=(e.clientX-r.left)/r.width,y=(e.clientY-r.top)/r.height;if(x<0||y<0||x>1||y>1)return;
+    c.punts.push([+x.toFixed(4),+y.toFixed(4)]);renderView()};
+  document.querySelectorAll('[data-cbt]').forEach(b=>b.onclick=()=>{c.t=Math.max(0,c.t+(+b.dataset.cbt));c.punts=[];renderView()});
+  $('#cbT').onchange=e=>{c.t=Math.max(0,+e.target.value||0);c.punts=[];renderView()};
+  $('#cbUndo').onclick=()=>{c.punts.pop();renderView()};
+  const sv=async pts=>{try{const d=await localPost('calibra',c.nom,{t:c.t,punts:pts});c.desat=true;c.k=d.lent_k;LOCAL=await localFetch()||LOCAL;renderView()}catch(x){toast(x.message)}};
+  $('#cbSave').onclick=()=>sv(c.punts);
+  $('#cbSave4').onclick=()=>sv(c.punts.slice(0,4));
+}
+
+/* ---------- Revisió de l'anàlisi automàtica ---------- */
+let revFilter='dubt';
+function hashId(s){let h=0;for(const ch of String(s))h=(h*31+ch.charCodeAt(0))|0;return Math.abs(h)}
+function dubte(j,r){
+  if(j.descartada)return null;
+  if(!j.costat_servei)return 'falta el costat de servei';
+  if(!r||!r.prop)return 'sense proposta';
+  if(r.fiSet)return 'fi de set';
+  if((r.conf||0)<0.75)return 'confiança baixa';
+  const d=j.final-j.inici;if(d<2||d>45)return 'durada estranya';
+  if(hashId(j.id+(S.auto.creat||''))%10===0)return "control a l'atzar";
+  return null;
+}
+function buildLabels(){
+  const R=revRows();
+  return {app:'sports-vidia-etiquetes',versio:2,video:S.auto.video,creat:new Date().toISOString(),
+    jugades:S.auto.jugades.slice().sort((a,b)=>a.inici-b.inici).map(j=>{const r=R.get(j.id);const w=j.guanya||null;
+      return {inici:j.inici,final:j.final,inici_proposat:j.inici0??null,final_proposat:j.final0??null,
+        ajust_inici:!!j.ajust_inici,ajust_final:!!j.ajust_final,
+        costat_servei:j.costat_servei||null,costat_proposat:j.costat0??null,costat_corregit:!!j.costat_corregit,
+        descartada:!!j.descartada,afegida:!!j.afegida,revisada:!!j.revisada,acceptada:!!j.acceptada,
+        guanya_equip:w,guanya_costat:w&&r?(w===r.nearAfter?'proper':'llunya'):null}})};
+}
 function viewRev(){
-  if(!S.auto)return `<h3 style="font-size:18px;margin-bottom:6px">Revisió de l'anàlisi automàtica</h3>
-    <p class="note" style="max-width:65ch">L'analitzador del PC detecta les jugades d'un vídeo i proposa qui guanya cada punt. Aquí importes el resultat, el revises amb el vídeo i l'apliques al partit. Cada correcció serveix perquè l'analitzador aprengui.</p>
-    <ol class="note" style="max-width:65ch;padding-left:18px"><li>Al PC: <code>python vidia_analitza.py calibra VIDEO.mp4</code> i després <code>analitza VIDEO.mp4</code>.</li><li>Aquí: obre el mateix fitxer de vídeo i importa el fitxer <code>.analisi.json</code>.</li></ol>
-    <div class="row edit"><label class="btn" for="vidFile" style="cursor:pointer">${mode==='file'?'Canvia el vídeo':'Obre el vídeo (MP4)'}</label><label class="btn pri" style="cursor:pointer">Importa l'anàlisi<input type="file" id="revImp" accept=".json,application/json" hidden></label></div>`;
+  if(calib)return viewCalib();
+  const isLocal=!!LOCAL;
+  if(!S.auto||localShow){
+    if(isLocal)return `${S.auto?`<div class="row" style="margin-bottom:8px"><button class="btn" id="revBackRev">← Torna a la revisió de ${esc(S.auto.video?S.auto.video.nom:'')}</button></div>`:''}<div id="localPanel">${localPanelHTML()}</div>`;
+    return `<h3 style="font-size:18px;margin-bottom:6px">Revisió de l'anàlisi automàtica</h3>
+    <p class="note" style="max-width:65ch">L'analitzador del PC detecta les jugades d'un vídeo i proposa qui guanya cada punt. Aquí les revises amb el vídeo i les apliques al partit. Cada correcció serveix perquè l'analitzador aprengui.</p>
+    <div class="warn" style="max-width:65ch"><b>Manera més fàcil:</b> al PC, executa <code>py vidia_analitza.py inicia "CARPETA_DELS_VIDEOS"</code>. S'obrirà l'app connectada a la carpeta: calibres, analitzes, revises i aprèn sense moure fitxers.</div>
+    <p class="note" style="max-width:65ch;margin-top:10px">Manera manual: analitza el vídeo al PC, obre aquí el mateix fitxer de vídeo i importa el fitxer <code>.analisi.json</code>.</p>
+    <div class="row edit"><label class="btn" for="vidFile" style="cursor:pointer">${mode==='file'?'Canvia el vídeo':'Obre el vídeo (MP4)'}</label><label class="btn" style="cursor:pointer">Importa l'anàlisi<input type="file" id="revImp" accept=".json,application/json" hidden></label></div>`;
+  }
   const A=S.auto,R=revRows();
-  const rows=A.jugades.slice().sort((a,b)=>a.inici-b.inici);
-  const nRev=rows.filter(j=>j.revisada).length,nDesc=rows.filter(j=>j.descartada).length;
-  const html=rows.map((j,k)=>{const r=R.get(j.id);
+  const all=A.jugades.slice().sort((a,b)=>a.inici-b.inici);
+  const why=new Map(all.map(j=>[j.id,dubte(j,R.get(j.id))]));
+  const dub=all.filter(j=>why.get(j.id));
+  const pend=dub.filter(j=>!j.revisada).length;
+  const segures=all.filter(j=>!j.descartada&&!why.get(j.id)&&!j.guanya&&!j.revisada).length;
+  const rows=revFilter==='dubt'?dub:all;
+  const nRev=all.filter(j=>j.revisada).length,nDesc=all.filter(j=>j.descartada).length;
+  const html=rows.map(j=>{const r=R.get(j.id),w=why.get(j.id);
     const tl=`<button class="tlink" data-seek="${Math.max(0,j.inici-2)}" data-until="${j.final+1.5}" title="Mira la jugada (s'atura en acabar)">▶ ${fmt(j.inici)}</button>`;
     if(j.descartada)return `<div class="li" data-rid="${j.id}" data-a="${j.inici}" data-b="${j.final}" style="opacity:.55">${tl}<span class="code">—</span><span>Descartada${j.afegida?' (afegida)':''}</span><span class="edit"><button class="mini" data-rundo="${j.id}">Recupera</button></span></div>`;
     const sel=j.guanya,prop=r&&r.prop;
     const btn=t=>`<button type="button" data-rwin="${j.id}" data-t="${t}" class="${sel===t?'on':''}" style="${!sel&&prop===t?'box-shadow:inset 0 0 0 2px var(--blue)':''}">${esc(tname(t))}</button>`;
-    return `<div class="li" data-rid="${j.id}" data-a="${j.inici}" data-b="${j.final}">${tl}<span class="code num">${r?`${r.nos}-${r.ells}`:''}</span>
-      <span style="min-width:0">Serveix ${r&&r.srv?esc(tname(r.srv)):'<b style="color:var(--bad)">? indica el costat</b>'} <span class="ctx">(${Math.round((j.final-j.inici))} s)</span><br>
-      <span class="ctx">${prop?`Proposta: ${esc(tname(prop))} · ${Math.round((r.conf||0)*100)}%`:'Sense proposta: indica-ho tu'}${r&&r.fiSet?' · fi de set':''}${j.revisada?' · revisada':''}</span>
+    return `<div class="li${w&&!j.revisada?' dub':''}" data-rid="${j.id}" data-a="${j.inici}" data-b="${j.final}">${tl}<span class="code num">${r?`${r.nos}-${r.ells}`:''}</span>
+      <span style="min-width:0">Serveix ${r&&r.srv?esc(tname(r.srv)):'<b style="color:var(--bad)">? indica el costat</b>'} <span class="ctx">(${Math.round((j.final-j.inici))} s)</span>${w?` <span class="why">${esc(w)}</span>`:''}<br>
+      <span class="ctx">${prop?`Proposta: ${esc(tname(prop))} · ${Math.round((r.conf||0)*100)}%`:'Sense proposta: indica-ho tu'}${j.revisada?' · revisada':j.acceptada?' · acceptada':''}</span>
       <span class="rtime edit">
         <span>Inici <b class="num${j.ajust_inici?' adj':''}">${fmtT(j.inici)}</b> <button type="button" class="mini" data-rset="${j.id}" data-k="inici" title="Posa l'inici al moment actual del vídeo">⇤ ara</button></span>
         <span>Final <b class="num${j.ajust_final?' adj':''}">${fmtT(j.final)}</b> <button type="button" class="mini" data-rset="${j.id}" data-k="final" title="Posa el final al moment actual del vídeo">ara ⇥</button></span>
         <span class="seg sm">${['proper','llunya'].map(c=>`<button type="button" data-rside="${j.id}" data-s="${c}" class="${j.costat_servei===c?'on':''}" title="Camp des d'on es serveix">${c==='proper'?'Camp proper':'Camp llunyà'}</button>`).join('')}</span>
       </span></span>
-      <span class="seg edit">${btn('nos')}${btn('ells')}<button type="button" data-rdesc="${j.id}" title="No és una jugada">✕</button></span></div>`}).join('');
+      <span class="seg edit">${btn('nos')}${btn('ells')}<button type="button" data-rdesc="${j.id}" title="No és una jugada">✕</button></span></div>`}).join('')
+    ||`<div class="li"><span></span><span></span><span class="note">${revFilter==='dubt'?'Cap jugada dubtosa.':'Cap jugada.'}</span><span></span></div>`;
   const nf=S.meta.fitxer&&A.video&&A.video.nom&&S.meta.fitxer!==A.video.nom;
-  return `<div class="row" style="justify-content:space-between"><h3 style="font-size:18px">Revisió · ${esc(A.video?A.video.nom:'')}</h3><span class="note">${rows.length} jugades · ${nRev} revisades · ${nDesc} descartades</span></div>
+  return `<div class="row" style="justify-content:space-between"><h3 style="font-size:18px">Revisió · ${esc(A.video?A.video.nom:'')}</h3>
+      <span class="row" style="gap:8px">${isLocal?`<button class="btn" id="revList2">Vídeos de la carpeta</button>`:''}<span class="note">${all.length} jugades · ${nRev} revisades · ${nDesc} descartades</span></span></div>
+    ${A.novaAnalisi?`<div class="warn row" style="justify-content:space-between">Hi ha una anàlisi més nova d'aquest vídeo.<button class="btn" id="revNew">Carrega-la (es perd la revisió actual)</button></div>`:''}
     ${nf?`<div class="warn">El vídeo obert (${esc(S.meta.fitxer)}) no és el de l'anàlisi.</div>`:''}
     ${mode!=='file'?`<div class="warn row" style="justify-content:space-between">Obre el fitxer de vídeo del partit per poder mirar cada jugada.<label class="btn pri" for="vidFile" style="cursor:pointer">Obre el vídeo (MP4)</label></div>`:''}
     <div class="ugrid edit">
@@ -933,31 +1110,37 @@ function viewRev(){
       <label class="flabel">Set a l'inici<input class="inp num" id="revSet" type="number" min="1" max="5" value="${A.cfg.set}"></label>
       <label class="flabel">Marcador a l'inici<span class="row" style="gap:4px"><input class="inp num" id="revN" type="number" min="0" value="${A.cfg.nos}" style="width:64px"> – <input class="inp num" id="revE" type="number" min="0" value="${A.cfg.ells}" style="width:64px"></span></label>
     </div>
+    <div class="row" style="justify-content:space-between;margin-top:6px">
+      <div class="seg" id="revFilt"><button type="button" data-rf="dubt" class="${revFilter==='dubt'?'on':''}">Dubtoses (${pend} pendents de ${dub.length})</button><button type="button" data-rf="tot" class="${revFilter==='tot'?'on':''}">Totes (${all.length})</button></div>
+      ${segures?`<button class="btn edit" id="revSafe">Accepta les ${segures} segures</button>`:''}
+    </div>
     <div class="log revlist" id="revList">${html}</div>
     <div class="row edit" style="margin-top:10px">
       <button class="btn" id="revAdd">Afegeix una jugada al moment actual</button>
-      <button class="btn" id="revAcc">Accepta les propostes pendents</button>
       <button class="btn pri" id="revApply">Aplica al partit</button>
     </div>
     <div class="row" style="margin-top:6px">
-      <button class="btn" id="revLab">Desa les correccions per a l'aprenentatge</button>
+      ${isLocal&&S.meta.local?`<button class="btn pri" id="revLearn">Desa i aprèn</button>`:''}
+      <button class="btn" id="revLab">${isLocal&&S.meta.local?'Descarrega les correccions':"Desa les correccions per a l'aprenentatge"}</button>
       <button class="btn bad edit" id="revDrop">Treu l'anàlisi</button>
     </div>
-    <p class="note" style="max-width:65ch">Per ajustar els temps: posa el vídeo al moment just del servei i prem <b>⇤ ara</b>; quan la pilota toca a terra o xiula l'àrbitre, prem <b>ara ⇥</b>. Els temps ajustats surten en blau i l'analitzador n'aprèn. El guanyador proposat surt de qui serveix la jugada següent. Les jugades on el servei és del camp llunyà tenen menys confiança: revisa-les primer. Quan apliques, els punts substitueixen els de l'anàlisi aplicada abans; els registres manuals es mantenen.</p>`;
+    <p class="note" style="max-width:65ch">Revisa primer les <b>dubtoses</b>: les que no tenen proposta, tenen poca confiança, tanquen un set o duren massa o massa poc, i unes quantes segures triades a l'atzar per comprovar que ho són. Després, <b>Accepta les segures</b>. Per ajustar els temps: posa el vídeo al moment just del servei i prem <b>⇤ ara</b>; quan la pilota toca a terra o xiula l'àrbitre, prem <b>ara ⇥</b>.</p>`;
 }
 function bindRev(){
+  if(calib)return bindCalib();
+  const b2=$('#revBackRev');if(b2)b2.onclick=()=>{localShow=false;renderView()};
   const imp=$('#revImp');
   if(imp)imp.onchange=e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{let a;
     try{a=JSON.parse(rd.result);if(a.app!=='sports-vidia-analisi'||!Array.isArray(a.jugades))throw 0}catch(x){return toast("Aquest fitxer no és una anàlisi de Sports VidIA")}
-    const {st}=replay();
-    S.auto={video:a.video,versio:a.versio,xiulet_hz:a.xiulet_hz,parametres:a.parametres,
-      cfg:{prop:'nos',set:st.set,nos:st.nos,ells:st.ells},
-      jugades:a.jugades.map((j,i)=>({...j,id:'a'+(i+1),guanya:null,descartada:false,revisada:false,afegida:false,inici0:j.inici,final0:j.final,costat0:j.costat_servei}))};
-    save();renderView();toast(`${a.jugades.length} jugades importades`)};rd.readAsText(f)};
-  if(!S.auto)return;
+    loadAnalysis(a);save();renderView();toast(`${a.jugades.length} jugades importades`)};rd.readAsText(f)};
+  if(!S.auto||localShow)return;
+  const l2=$('#revList2');if(l2)l2.onclick=async()=>{localShow=true;LOCAL=await localFetch()||LOCAL;renderView()};
+  const rn=$('#revNew');if(rn)rn.onclick=()=>{if(rn.dataset.sure!=='1'){rn.dataset.sure='1';rn.textContent='Confirma';return}loadLocalAnalysis(S.meta.local,true)};
   const v=$('#view');
-  v.onclick=e=>{const b=e.target.closest('button');if(!b||!canEdit())return;const d=b.dataset;const J=id=>S.auto.jugades.find(x=>x.id===id);
-    if(d.rwin){const j=J(d.rwin);j.guanya=j.guanya===d.t?null:d.t;j.revisada=true;save();renderView()}
+  v.onclick=e=>{const b=e.target.closest('button');if(!b)return;const d=b.dataset;
+    if(d.rf){revFilter=d.rf;renderView();return}
+    if(!canEdit())return;const J=id=>S.auto.jugades.find(x=>x.id===id);
+    if(d.rwin){const j=J(d.rwin);j.guanya=j.guanya===d.t?null:d.t;j.revisada=true;j.acceptada=false;save();renderView()}
     else if(d.rdesc){const j=J(d.rdesc);j.descartada=true;j.revisada=true;save();renderView()}
     else if(d.rundo){const j=J(d.rundo);j.descartada=false;save();renderView()}
     else if(d.rset){if(mode!=='file')return toast('Obre el vídeo per ajustar els temps');const j=J(d.rset),t=Math.round(curTime()*10)/10;
@@ -970,23 +1153,23 @@ function bindRev(){
   const add=$('#revAdd');if(add)add.onclick=()=>{const t=Math.round(curTime()*10)/10;
     S.auto.jugades.push({id:'u'+Date.now().toString(36),n:0,inici:t,final:t+8,costat_servei:null,confianca_servei:1,guanya:null,descartada:false,revisada:true,afegida:true,ajust_inici:true});
     save();renderView();toast('Jugada afegida a '+fmt(t)+'. Indica des de quin camp es serveix i marca el final.')};
-  const acc=$('#revAcc');if(acc)acc.onclick=()=>{const R=revRows();let n=0;S.auto.jugades.forEach(j=>{const r=R.get(j.id);if(!j.descartada&&!j.guanya&&r&&r.prop){j.guanya=r.prop;j.revisada=true;n++}});save();renderView();toast(n+' propostes acceptades')};
+  const safe=$('#revSafe');if(safe)safe.onclick=()=>{const R=revRows();let n=0;
+    S.auto.jugades.forEach(j=>{const r=R.get(j.id);if(!j.descartada&&!j.guanya&&!j.revisada&&!dubte(j,r)&&r&&r.prop){j.guanya=r.prop;j.acceptada=true;n++}});
+    save();renderView();toast(n+' jugades segures acceptades')};
   const ap=$('#revApply');if(ap)ap.onclick=()=>{const R=revRows();
     const pts=S.auto.jugades.filter(j=>!j.descartada).sort((a,b)=>a.inici-b.inici).map(j=>({j,w:j.guanya||(R.get(j.id)||{}).prop})).filter(x=>x.w);
     S.ev=S.ev.filter(e=>e.origen!=='auto');
     pts.forEach(({j,w})=>S.ev.push({id:S.nextId++,tipus:'punt',t:j.final,guanya:w,auto:false,origen:'auto',jugada:j.id}));
     S.ev=S.ev.map((e,i)=>[e,i]).sort((a,b)=>(a[0].t||0)-(b[0].t||0)||a[1]-b[1]).map(x=>x[0]);
     S.auto.aplicada=Date.now();S.meta.exemple=false;save();render();toast(`${pts.length} punts aplicats al partit`)};
-  $('#revLab').onclick=()=>{const R=revRows();
-    const falta=S.auto.jugades.filter(j=>!j.descartada&&!j.costat_servei).length;if(falta)return toast(`Falta el costat de servei a ${falta} jugada${falta>1?'es':''}`);
-    const lab={app:'sports-vidia-etiquetes',versio:2,video:S.auto.video,creat:new Date().toISOString(),
-      jugades:S.auto.jugades.slice().sort((a,b)=>a.inici-b.inici).map(j=>{const r=R.get(j.id);const w=j.guanya||null;
-        return {inici:j.inici,final:j.final,inici_proposat:j.inici0??null,final_proposat:j.final0??null,
-          ajust_inici:!!j.ajust_inici,ajust_final:!!j.ajust_final,
-          costat_servei:j.costat_servei||null,costat_proposat:j.costat0??null,costat_corregit:!!j.costat_corregit,
-          descartada:!!j.descartada,afegida:!!j.afegida,revisada:!!j.revisada,
-          guanya_equip:w,guanya_costat:w&&r?(w===r.nearAfter?'proper':'llunya'):null}})};
-    offerFile(((S.auto.video&&S.auto.video.nom)||'video')+'.etiquetes.json',JSON.stringify(lab,null,1))};
+  const checkSides=()=>{const falta=S.auto.jugades.filter(j=>!j.descartada&&!j.costat_servei).length;if(falta){toast(`Falta el costat de servei a ${falta} jugada${falta>1?'es':''}`);return false}return true};
+  $('#revLab').onclick=()=>{if(!checkSides())return;offerFile(((S.auto.video&&S.auto.video.nom)||'video')+'.etiquetes.json',JSON.stringify(buildLabels(),null,1))};
+  const lr=$('#revLearn');if(lr)lr.onclick=async()=>{if(!checkSides())return;
+    const pend=S.auto.jugades.filter(j=>!j.descartada&&dubte(j,revRows().get(j.id))&&!j.revisada).length;
+    if(pend&&lr.dataset.sure!=='1'){lr.dataset.sure='1';lr.textContent=`Queden ${pend} dubtoses: desa igualment`;return}
+    try{lr.disabled=true;await localPost('etiquetes',S.meta.local,buildLabels());localPrev[S.meta.local]={estat:'a la cua'};
+      S.auto.desat=Date.now();save();toast("Correccions desades. L'analitzador està aprenent…");LOCAL=await localFetch()||LOCAL}
+    catch(x){toast(x.message)}finally{lr.disabled=false}};
   const dr=$('#revDrop');if(dr)dr.onclick=()=>{if(dr.dataset.sure!=='1'){dr.dataset.sure='1';dr.textContent='Confirma: treu l\'anàlisi';return}
     S.auto=null;save();renderView();toast("Anàlisi treta (els punts aplicats es mantenen)")};
 }
@@ -1210,7 +1393,10 @@ function matchId(){return 'm'+Date.now().toString(36)+Math.random().toString(36)
 function addMatch(m){m.id=m.id||matchId();m.created=m.created||Date.now();m.updated=Date.now();if(!m.alin)m.alin={};DATA.matches[m.id]=m;return m}
 function openMatch(id){const m=DATA.matches[id];if(!m)return;S=m;DATA.current=id;if(!S.alin)S.alin={};
   sel={jug:null,fon:null,zi:null,zf:null};ui.dismissed={};closeBoxes();clk.base=0;clk.run=false;
-  if(canEdit())save();ytReady?makePlayer():setMode('clock');showView('match');render()}
+  if(canEdit())save();
+  if(LOCAL&&S.meta.local&&LOCAL.videos.some(v=>v.nom===S.meta.local))attachLocalVideo(S.meta.local);
+  else if(vfileURL&&!vfileURL.startsWith('blob:')){vfileURL=null;const vv=$('#vfile');vv.removeAttribute('src');vv.load();$('#vidName').textContent='';$('#vidClose').hidden=true;mode='clock'}
+  ytReady?makePlayer():setMode('clock');showView('match');render()}
 function newMatch(m){addMatch(m);openMatch(m.id)}
 function sortedMatches(){return Object.values(DATA.matches).sort((a,b)=>(b.meta.data||'').localeCompare(a.meta.data||'')||b.created-a.created)}
 
@@ -1281,7 +1467,7 @@ function enter(){
   $('#whoami').textContent=`${ME.u} · ${ROLES[ME.role]}`;
   if(!DATA.matches[DATA.current]){const f=sortedMatches()[0];if(f)DATA.current=f.id;else if(canEdit()){addMatch(empty());DATA.current=Object.keys(DATA.matches)[0]}}
   if(DATA.matches[DATA.current]){openMatch(DATA.current)}else{S=empty();showView('lib')}
-  lastAct=Date.now();
+  lastAct=Date.now();localInit();
 }
 async function lock(msg){await flush();V=await loadVault()||V;DATA=null;DEK=null;RAW=null;ME=null;S=empty();closeBoxes();showView('match');render();showLogin(msg);$('#gate').hidden=false}
 let lastAct=Date.now();

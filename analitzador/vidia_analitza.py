@@ -717,17 +717,17 @@ def estat_fase():
         estables += 1
     checks = [
         (f"Partits sencers revisats: {h['partits_sencers']} de {C['partits_sencers']}", h["partits_sencers"] >= C["partits_sencers"]),
-        (f"Jugades trobades: {d['pct_trobades']:.0%} (cal ≥ {C['trobades']:.0%})", d["pct_trobades"] >= C["trobades"]),
-        (f"Jugades falses: {d['pct_falses']:.0%} (cal ≤ {C['falses']:.0%})", d["pct_falses"] <= C["falses"]),
-        (f"Guanyador encertat: {d['pct_guanyador']:.0%} (cal ≥ {C['guanyador']:.0%})", d["pct_guanyador"] >= C["guanyador"]),
+        (f"Jugades trobades: {d['pct_trobades']:.0%} (cal >= {C['trobades']:.0%})", d["pct_trobades"] >= C["trobades"]),
+        (f"Jugades falses: {d['pct_falses']:.0%} (cal <= {C['falses']:.0%})", d["pct_falses"] <= C["falses"]),
+        (f"Guanyador encertat: {d['pct_guanyador']:.0%} (cal >= {C['guanyador']:.0%})", d["pct_guanyador"] >= C["guanyador"]),
         (f"Partits nous seguits sense canviar paràmetres: {estables} de {C['sense_canvis']}", estables >= C["sense_canvis"]),
     ]
     print("\nCriteris per passar a la fase 2:")
     for t, ok in checks:
         print(f"  [{'x' if ok else ' '}] {t}")
     llest = all(ok for _, ok in checks)
-    print("  → La fase 1 ha arribat al seu límit: es pot passar a la fase 2." if llest
-          else "  → Encara a la fase 1.")
+    print("  => La fase 1 ha arribat al seu límit: es pot passar a la fase 2." if llest
+          else "  => Encara a la fase 1.")
     return llest
 
 
@@ -800,7 +800,17 @@ def oblida(nom):
         apren("partit tret")
 
 
+def _consola_utf8():
+    """A Windows, algunes consoles no fan servir UTF-8: evita que un caràcter especial aturi el programa."""
+    for f in (sys.stdout, sys.stderr):
+        try:
+            f.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
+
 def main():
+    _consola_utf8()
     ap = argparse.ArgumentParser(description="Sports VidIA · analitzador automàtic de jugades")
     sub = ap.add_subparsers(dest="ordre", required=True)
     c = sub.add_parser("calibra", help="marca les cantonades de la pista")

@@ -1,0 +1,20 @@
+{
+ "xiulet_banda_hz": [
+  2000,
+  5000
+ ],
+ "xiulet_llindar": 1.5,
+ "xiulet_min_sep_s": 1.5,
+ "servei_finestra_s": 9.0,
+ "servei_llindar": 0.02,
+ "servei_durada_s": 0.7,
+ "moviment_ratio": 1.6,
+ "fusio_servei_s": 6.0,
+ "fps_analisi": 10,
+ "amplada_analisi": 320,
+ "final_repos_pct": 30,
+ "despl_inici_proper": 0.0,
+ "despl_inici_llunya": 0.0,
+ "despl_final_xiulet": 0.0,
+ "despl_final_moviment": 0.0
+}

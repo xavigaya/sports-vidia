@@ -37,6 +37,11 @@ DEFAULT_PARAMS = {
     "servei_durada_s": 0.7,            # el servidor ha d'estar com a mínim això a la zona
     "moviment_ratio": 1.25,            # pujada de moviment que indica que comença una jugada
     "fusio_servei_s": 6.0,             # xiulets de servei més propers que això es fusionen
+    "final_repos_pct": 30,             # percentil de moviment que es considera "joc aturat"
+    "despl_inici_proper": 0.0,         # correccions apreses (segons) a l'inici i al final de jugada
+    "despl_inici_llunya": 0.0,
+    "despl_final_xiulet": 0.0,
+    "despl_final_moviment": 0.0,
     "fps_analisi": 10,
     "amplada_analisi": 320,
 }
@@ -422,11 +427,12 @@ def detecta(xiulets, mov, near, far, fps, params, durada):
         fus.append(s)
     serveis = fus
     tots = [x["t"] for x in xiulets]
-    rest = float(np.percentile(movs, 30)) if movs.size else 0
+    rest = float(np.percentile(movs, params.get("final_repos_pct", 30))) if movs.size else 0
     jugades = []
     for i, s in enumerate(serveis):
         seg_t = serveis[i + 1]["servei"] - 3 if i + 1 < len(serveis) else durada
         finals = [t for t in tots if s["servei"] + 2 < t < seg_t]
+        metode = "xiulet"
         if finals:
             fi = finals[0]
         else:
@@ -434,7 +440,11 @@ def detecta(xiulets, mov, near, far, fps, params, durada):
             seg = movs[a:b]
             low = np.where(seg[2 * fps:] < rest)[0] if seg.size > 3 * fps else np.array([])
             fi = s["servei"] + 2 + low[0] / fps if low.size else min(seg_t, durada)
-        jugades.append({"n": i + 1, "inici": s["servei"], "final": round(float(max(fi, s["servei"] + 1)), 1),
+            metode = "moviment" if low.size else "seguent"
+        ini = s["servei"] + params.get("despl_inici_" + s["costat_servei"], 0.0)
+        fi = fi + params.get("despl_final_" + metode, 0.0) if metode != "seguent" else fi
+        jugades.append({"n": i + 1, "inici": round(float(ini), 1), "final": round(float(max(fi, ini + 1)), 1),
+                        "final_metode": metode,
                         "xiulet": s["xiulet"], "costat_servei": s["costat_servei"],
                         "confianca_servei": s["confianca_servei"]})
     for i, j in enumerate(jugades):
@@ -489,6 +499,7 @@ APR = AQUI / "aprenentatge"
 INDEX = APR / "index.json"
 HIST = APR / "historial.json"
 TUNED = ("xiulet_llindar", "servei_llindar", "moviment_ratio")
+TIMING = ("despl_inici_proper", "despl_inici_llunya", "despl_final_xiulet", "despl_final_moviment")
 GRID = {"xiulet_llindar": (0.6, 0.8, 1.0, 1.2, 1.5),
         "servei_llindar": (0.012, 0.016, 0.020, 0.026, 0.034),
         "moviment_ratio": (1.15, 1.25, 1.4, 1.6)}
@@ -527,9 +538,10 @@ def detecta_de_senyals(sig, params):
 
 
 def compara(det, etiquetes):
-    """Compara jugades detectades amb les revisades. Retorna comptadors."""
+    """Compara jugades detectades amb les revisades. Retorna comptadors i desviacions."""
     veritat = sorted([j for j in etiquetes if not j.get("descartada")], key=lambda j: j["inici"])
-    usades, trobades, enc_g, amb_g = set(), 0, 0, 0
+    usades, trobades, enc_g, amb_g, srv_ok, amb_srv = set(), 0, 0, 0, 0, 0
+    d_ini = {"proper": [], "llunya": []}; d_fi = {"xiulet": [], "moviment": []}; err_fi = []; err_ini = []
     for v in veritat:
         best, bd = None, 4.0
         for k, d in enumerate(det):
@@ -540,20 +552,44 @@ def compara(det, etiquetes):
                 best, bd = k, dd
         if v.get("guanya_costat"):
             amb_g += 1
-        if best is not None:
-            usades.add(best); trobades += 1
-            if v.get("guanya_costat") and det[best].get("guanya_costat") == v["guanya_costat"]:
-                enc_g += 1
+        if best is None:
+            continue
+        d = det[best]
+        usades.add(best); trobades += 1
+        if v.get("guanya_costat") and d.get("guanya_costat") == v["guanya_costat"]:
+            enc_g += 1
+        if v.get("costat_servei") and (v.get("costat_corregit") or v.get("revisada")):
+            amb_srv += 1
+            srv_ok += d.get("costat_servei") == v["costat_servei"]
+        if v.get("ajust_inici"):
+            err_ini.append(abs(d["inici"] - v["inici"]))
+            if d.get("costat_servei") in d_ini:
+                d_ini[d["costat_servei"]].append(v["inici"] - d["inici"])
+        if v.get("ajust_final") and v.get("final") is not None:
+            err_fi.append(abs(d["final"] - v["final"]))
+            if d.get("final_metode") in d_fi:
+                d_fi[d["final_metode"]].append(v["final"] - d["final"])
     return {"reals": len(veritat), "detectades": len(det), "trobades": trobades,
-            "falses": len(det) - len(usades), "amb_guanyador": amb_g, "guanyador_ok": enc_g}
+            "falses": len(det) - len(usades), "amb_guanyador": amb_g, "guanyador_ok": enc_g,
+            "amb_servei": amb_srv, "servei_ok": srv_ok, "err_inici": err_ini, "err_final": err_fi,
+            "desv_inici": d_ini, "desv_final": d_fi}
 
 
 def _suma(rs):
-    t = {k: sum(r[k] for r in rs) for k in ("reals", "detectades", "trobades", "falses", "amb_guanyador", "guanyador_ok")}
+    t = {k: sum(r[k] for r in rs) for k in ("reals", "detectades", "trobades", "falses", "amb_guanyador",
+                                             "guanyador_ok", "amb_servei", "servei_ok")}
     t["pct_trobades"] = t["trobades"] / t["reals"] if t["reals"] else 0
     t["pct_falses"] = t["falses"] / t["detectades"] if t["detectades"] else 0
     t["pct_guanyador"] = t["guanyador_ok"] / t["amb_guanyador"] if t["amb_guanyador"] else 0
-    t["puntuacio"] = (2 * t["trobades"] / (t["reals"] + t["detectades"]) if t["reals"] + t["detectades"] else 0) + t["pct_guanyador"]
+    t["pct_servei"] = t["servei_ok"] / t["amb_servei"] if t["amb_servei"] else None
+    ei = [x for r in rs for x in r["err_inici"]]; ef = [x for r in rs for x in r["err_final"]]
+    t["err_inici_s"] = float(np.median(ei)) if ei else None
+    t["err_final_s"] = float(np.median(ef)) if ef else None
+    t["n_ajust_final"] = len(ef); t["n_ajust_inici"] = len(ei)
+    t["desv_inici"] = {k: [x for r in rs for x in r["desv_inici"][k]] for k in ("proper", "llunya")}
+    t["desv_final"] = {k: [x for r in rs for x in r["desv_final"][k]] for k in ("xiulet", "moviment")}
+    f1 = 2 * t["trobades"] / (t["reals"] + t["detectades"]) if t["reals"] + t["detectades"] else 0
+    t["puntuacio"] = f1 + t["pct_guanyador"] + 0.5 * (t["pct_servei"] or 0)
     return t
 
 
@@ -579,6 +615,24 @@ def avalua_conjunt(conjunt, params):
     return per, _suma(per)
 
 
+def _resum(t):
+    out = {k: (round(t[k], 4) if isinstance(t[k], float) else t[k]) for k in ("pct_trobades", "pct_falses", "pct_guanyador")}
+    for k in ("pct_servei", "err_inici_s", "err_final_s"):
+        out[k] = round(t[k], 3) if t[k] is not None else None
+    return out
+
+
+def _fmt_tot(t):
+    s = f"{t['pct_trobades']:.0%} trobades · {t['pct_falses']:.0%} falses · {t['pct_guanyador']:.0%} guanyador"
+    if t.get("pct_servei") is not None:
+        s += f" · {t['pct_servei']:.0%} costat de servei"
+    if t.get("err_inici_s") is not None:
+        s += f" · inici ±{t['err_inici_s']:.1f} s"
+    if t.get("err_final_s") is not None:
+        s += f" · final ±{t['err_final_s']:.1f} s"
+    return s
+
+
 def apren(motiu="aprenentatge", verbose=True):
     conjunt = carrega_conjunt()
     if not conjunt:
@@ -594,31 +648,54 @@ def apren(motiu="aprenentatge", verbose=True):
         _, t = avalua_conjunt(conjunt, p)
         if t["puntuacio"] > millor["puntuacio"] + 1e-6:
             millor, mp = t, p
-    canvi = any(abs(mp[k] - base[k]) > 1e-9 for k in TUNED)
+    # 2a etapa: precisió de l'inici i del final, amb les jugades on s'han ajustat a mà
+    temps_info = None
+    _, tz = avalua_conjunt(conjunt, dict(mp, **{k: 0.0 for k in TIMING}))
+    if tz["n_ajust_final"] + tz["n_ajust_inici"] >= 3:
+        best_t = None
+        for rp in (20, 30, 40):
+            p0 = dict(mp, final_repos_pct=rp, **{k: 0.0 for k in TIMING})
+            _, t0 = avalua_conjunt(conjunt, p0)
+            offs = {}
+            for side, xs in t0["desv_inici"].items():
+                offs["despl_inici_" + side] = round(float(np.median(xs)), 1) if len(xs) >= 3 else 0.0
+            for met, xs in t0["desv_final"].items():
+                offs["despl_final_" + met] = round(float(np.median(xs)), 1) if len(xs) >= 3 else 0.0
+            p1 = dict(p0, **offs)
+            _, t1 = avalua_conjunt(conjunt, p1)
+            key = (t1["err_final_s"] if t1["err_final_s"] is not None else 0) + (t1["err_inici_s"] or 0)
+            if t1["puntuacio"] >= millor["puntuacio"] - 0.01 and (best_t is None or key < best_t[0]):
+                best_t = (key, p1)
+        if best_t:
+            mp = best_t[1]
+            temps_info = {k: mp[k] for k in ("final_repos_pct",) + TIMING}
+    canvi = any(abs(mp.get(k, 0) - base.get(k, 0)) > 1e-9 for k in TUNED + ("final_repos_pct",) + TIMING)
     if canvi:
         cur = _jread(PARAMS_FILE, {})
-        cur.update({k: mp[k] for k in TUNED})
+        cur.update({k: mp[k] for k in TUNED + ("final_repos_pct",) + TIMING if k in mp})
         _jwrite(PARAMS_FILE, cur)
     per1, tot1 = avalua_conjunt(conjunt, mp)
     hist = _jread(HIST, [])
     hist.append({"data": time.strftime("%Y-%m-%d %H:%M"), "motiu": motiu, "partits": len(conjunt),
                  "partits_sencers": sum(1 for e, s, _ in conjunt if float(s["durada"]) >= CRITERIS["durada_partit_sencer_s"]),
-                 "abans": {k: round(tot0[k], 4) for k in ("pct_trobades", "pct_falses", "pct_guanyador")},
-                 "despres": {k: round(tot1[k], 4) for k in ("pct_trobades", "pct_falses", "pct_guanyador")},
-                 "parametres": {k: mp[k] for k in TUNED}, "canvi_parametres": canvi,
-                 "per_partit": [{k: r[k] for k in ("nom", "reals", "trobades", "falses", "amb_guanyador", "guanyador_ok")} for r in per1]})
+                 "abans": _resum(tot0), "despres": _resum(tot1),
+                 "parametres": {k: mp.get(k) for k in TUNED + ("final_repos_pct",) + TIMING}, "canvi_parametres": canvi,
+                 "per_partit": [{k: r[k] for k in ("nom", "reals", "trobades", "falses", "amb_guanyador", "guanyador_ok", "amb_servei", "servei_ok")} for r in per1]})
     _jwrite(HIST, hist)
     if verbose:
         print()
-        print(f"{'Partit':<38}{'Jugades':>9}{'Trobades':>10}{'Falses':>8}{'Guanyador':>11}")
+        print(f"{'Partit':<34}{'Jugades':>8}{'Trobades':>9}{'Falses':>7}{'Guanyador':>10}{'Servei':>8}{'Final ±s':>9}")
         for r in per1:
             g = f"{r['guanyador_ok']}/{r['amb_guanyador']}" if r["amb_guanyador"] else "–"
-            print(f"{r['nom'][:37]:<38}{r['reals']:>9}{r['trobades']:>10}{r['falses']:>8}{g:>11}")
-        print(f"\nTotal amb els paràmetres {'nous' if canvi else 'actuals'}: "
-              f"{tot1['pct_trobades']:.0%} trobades · {tot1['pct_falses']:.0%} falses · {tot1['pct_guanyador']:.0%} guanyador encertat")
+            sv = f"{r['servei_ok']}/{r['amb_servei']}" if r["amb_servei"] else "–"
+            ef = f"{np.median(r['err_final']):.1f}" if r["err_final"] else "–"
+            print(f"{r['nom'][:33]:<34}{r['reals']:>8}{r['trobades']:>9}{r['falses']:>7}{g:>10}{sv:>8}{ef:>9}")
+        print(f"\nTotal amb els paràmetres {'nous' if canvi else 'actuals'}: {_fmt_tot(tot1)}")
         if canvi:
-            print(f"Abans: {tot0['pct_trobades']:.0%} trobades · {tot0['pct_falses']:.0%} falses · {tot0['pct_guanyador']:.0%} guanyador encertat")
+            print(f"Abans: {_fmt_tot(tot0)}")
             print(f"Paràmetres nous desats a {PARAMS_FILE.name}: {({k: mp[k] for k in TUNED})}")
+            if temps_info:
+                print(f"Correccions de temps apreses: {temps_info}")
         else:
             print("Els paràmetres actuals ja són els millors per al conjunt.")
         estat_fase()
@@ -702,8 +779,7 @@ def mostra_estat():
         print("\nHistorial:")
         for h in hist[-10:]:
             d = h["despres"]
-            print(f"  {h['data']}  {h['motiu']:<26} {h['partits']} partits  "
-                  f"{d['pct_trobades']:.0%} trobades · {d['pct_falses']:.0%} falses · {d['pct_guanyador']:.0%} guanyador"
+            print(f"  {h['data']}  {h['motiu']:<26} {h['partits']} partits  {_fmt_tot(d)}"
                   f"{'  · paràmetres canviats' if h['canvi_parametres'] else ''}")
     estat_fase()
 

@@ -74,6 +74,9 @@ button{cursor:pointer}
 @media (min-width:981px){.revmode .video{position:sticky;top:0;z-index:3}}
 /* Al mòbil, durant la revisió, el vídeo passa a ser un reproductor petit fix */
 @media (max-width:980px){.revmode .video{position:fixed;right:8px;bottom:calc(8px + env(safe-area-inset-bottom,0px));width:min(52vw,340px);z-index:15;box-shadow:0 6px 24px rgba(0,0,0,.35);border:1px solid var(--line)}}
+.rtime{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;margin-top:5px;font-size:12px;color:var(--muted)}
+.rtime b{color:var(--ink);font-weight:600}.rtime b.adj{color:var(--blue)}
+.seg.sm button{padding:3px 8px;font-size:12px}
 .revlist{max-height:min(62vh,640px);overflow:auto;border:1px solid var(--line);border-radius:8px}
 .revlist .li.now{background:color-mix(in srgb,var(--ball) 22%,var(--surface))}
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;display:grid;gap:12px;min-width:0}
@@ -874,6 +877,7 @@ function viewZon(A){
 function bindZon(){$('#hF').onchange=e=>{heatF=e.target.value;renderView()};$('#hJ').onchange=e=>{heatJ=e.target.value;renderView()};$('#hM').onchange=e=>{heatMode=e.target.value;renderView()}}
 
 /* ---------- Revisió de l'anàlisi automàtica ---------- */
+function fmtT(t){t=Math.max(0,+t||0);const m=Math.floor(t/60),x=t-m*60;return m+':'+(x<10?'0':'')+x.toFixed(1)}
 const other=t=>t==='nos'?'ells':'nos';
 const tname=t=>t==='nos'?S.meta.equip:S.meta.rival;
 function revRows(){
@@ -882,7 +886,7 @@ function revRows(){
   const live=A.jugades.filter(j=>!j.descartada).sort((a,b)=>a.inici-b.inici);
   const out=new Map();
   live.forEach((j,i)=>{
-    const map=side=>side==='proper'?near:other(near);
+    const map=side=>side==='proper'?near:side==='llunya'?other(near):null;
     const nx=live[i+1];
     const prop=nx?map(nx.costat_servei):null;
     const r={set,nos:n,ells:e,near,srv:map(j.costat_servei),prop,
@@ -912,8 +916,13 @@ function viewRev(){
     const sel=j.guanya,prop=r&&r.prop;
     const btn=t=>`<button type="button" data-rwin="${j.id}" data-t="${t}" class="${sel===t?'on':''}" style="${!sel&&prop===t?'box-shadow:inset 0 0 0 2px var(--blue)':''}">${esc(tname(t))}</button>`;
     return `<div class="li" data-rid="${j.id}" data-a="${j.inici}" data-b="${j.final}">${tl}<span class="code num">${r?`${r.nos}-${r.ells}`:''}</span>
-      <span style="min-width:0">Serveix ${r?esc(tname(r.srv)):'?'} <span class="ctx">(${j.costat_servei==='proper'?'camp proper':'camp llunyà'} · ${Math.round((j.final-j.inici))} s)</span><br>
-      <span class="ctx">${prop?`Proposta: ${esc(tname(prop))} · ${Math.round((r.conf||0)*100)}%`:'Sense proposta: indica-ho tu'}${r&&r.fiSet?' · fi de set':''}${j.revisada?' · revisada':''}</span></span>
+      <span style="min-width:0">Serveix ${r&&r.srv?esc(tname(r.srv)):'<b style="color:var(--bad)">? indica el costat</b>'} <span class="ctx">(${Math.round((j.final-j.inici))} s)</span><br>
+      <span class="ctx">${prop?`Proposta: ${esc(tname(prop))} · ${Math.round((r.conf||0)*100)}%`:'Sense proposta: indica-ho tu'}${r&&r.fiSet?' · fi de set':''}${j.revisada?' · revisada':''}</span>
+      <span class="rtime edit">
+        <span>Inici <b class="num${j.ajust_inici?' adj':''}">${fmtT(j.inici)}</b> <button type="button" class="mini" data-rset="${j.id}" data-k="inici" title="Posa l'inici al moment actual del vídeo">⇤ ara</button></span>
+        <span>Final <b class="num${j.ajust_final?' adj':''}">${fmtT(j.final)}</b> <button type="button" class="mini" data-rset="${j.id}" data-k="final" title="Posa el final al moment actual del vídeo">ara ⇥</button></span>
+        <span class="seg sm">${['proper','llunya'].map(c=>`<button type="button" data-rside="${j.id}" data-s="${c}" class="${j.costat_servei===c?'on':''}" title="Camp des d'on es serveix">${c==='proper'?'Camp proper':'Camp llunyà'}</button>`).join('')}</span>
+      </span></span>
       <span class="seg edit">${btn('nos')}${btn('ells')}<button type="button" data-rdesc="${j.id}" title="No és una jugada">✕</button></span></div>`}).join('');
   const nf=S.meta.fitxer&&A.video&&A.video.nom&&S.meta.fitxer!==A.video.nom;
   return `<div class="row" style="justify-content:space-between"><h3 style="font-size:18px">Revisió · ${esc(A.video?A.video.nom:'')}</h3><span class="note">${rows.length} jugades · ${nRev} revisades · ${nDesc} descartades</span></div>
@@ -934,7 +943,7 @@ function viewRev(){
       <button class="btn" id="revLab">Desa les correccions per a l'aprenentatge</button>
       <button class="btn bad edit" id="revDrop">Treu l'anàlisi</button>
     </div>
-    <p class="note" style="max-width:65ch">El guanyador proposat surt de qui serveix la jugada següent. Les jugades on el servei és del camp llunyà tenen menys confiança: revisa-les primer. Quan apliques, els punts substitueixen els de l'anàlisi aplicada abans; els registres manuals es mantenen.</p>`;
+    <p class="note" style="max-width:65ch">Per ajustar els temps: posa el vídeo al moment just del servei i prem <b>⇤ ara</b>; quan la pilota toca a terra o xiula l'àrbitre, prem <b>ara ⇥</b>. Els temps ajustats surten en blau i l'analitzador n'aprèn. El guanyador proposat surt de qui serveix la jugada següent. Les jugades on el servei és del camp llunyà tenen menys confiança: revisa-les primer. Quan apliques, els punts substitueixen els de l'anàlisi aplicada abans; els registres manuals es mantenen.</p>`;
 }
 function bindRev(){
   const imp=$('#revImp');
@@ -943,19 +952,24 @@ function bindRev(){
     const {st}=replay();
     S.auto={video:a.video,versio:a.versio,xiulet_hz:a.xiulet_hz,parametres:a.parametres,
       cfg:{prop:'nos',set:st.set,nos:st.nos,ells:st.ells},
-      jugades:a.jugades.map((j,i)=>({...j,id:'a'+(i+1),guanya:null,descartada:false,revisada:false,afegida:false}))};
+      jugades:a.jugades.map((j,i)=>({...j,id:'a'+(i+1),guanya:null,descartada:false,revisada:false,afegida:false,inici0:j.inici,final0:j.final,costat0:j.costat_servei}))};
     save();renderView();toast(`${a.jugades.length} jugades importades`)};rd.readAsText(f)};
   if(!S.auto)return;
   const v=$('#view');
   v.onclick=e=>{const b=e.target.closest('button');if(!b||!canEdit())return;const d=b.dataset;const J=id=>S.auto.jugades.find(x=>x.id===id);
     if(d.rwin){const j=J(d.rwin);j.guanya=j.guanya===d.t?null:d.t;j.revisada=true;save();renderView()}
     else if(d.rdesc){const j=J(d.rdesc);j.descartada=true;j.revisada=true;save();renderView()}
-    else if(d.rundo){const j=J(d.rundo);j.descartada=false;save();renderView()}};
+    else if(d.rundo){const j=J(d.rundo);j.descartada=false;save();renderView()}
+    else if(d.rset){if(mode!=='file')return toast('Obre el vídeo per ajustar els temps');const j=J(d.rset),t=Math.round(curTime()*10)/10;
+      if(d.k==='inici'){if(t>=j.final)return toast("L'inici ha de ser abans del final ("+fmtT(j.final)+")");j.inici=t;j.ajust_inici=true}
+      else{if(t<=j.inici)return toast("El final ha de ser després de l'inici ("+fmtT(j.inici)+")");j.final=t;j.ajust_final=true}
+      j.revisada=true;save();renderView();toast((d.k==='inici'?'Inici':'Final')+' a '+fmtT(t))}
+    else if(d.rside){const j=J(d.rside);j.costat_servei=d.s;j.costat_corregit=(j.costat0!==undefined&&j.costat0!==d.s)||!!j.afegida;j.revisada=true;save();renderView()}};
   const cfgUp=()=>{S.auto.cfg={prop:$('#revProp').value,set:Math.min(5,Math.max(1,+$('#revSet').value||1)),nos:+$('#revN').value||0,ells:+$('#revE').value||0};save();renderView()};
   ['#revProp','#revSet','#revN','#revE'].forEach(id=>{const x=$(id);if(x)x.onchange=cfgUp});
   const add=$('#revAdd');if(add)add.onclick=()=>{const t=Math.round(curTime()*10)/10;
-    S.auto.jugades.push({id:'u'+Date.now().toString(36),n:0,inici:t,final:t+8,costat_servei:'proper',confianca_servei:0,guanya:null,descartada:false,revisada:true,afegida:true});
-    save();renderView();toast('Jugada afegida a '+fmt(t)+'. Indica qui guanya i on es serveix si cal.')};
+    S.auto.jugades.push({id:'u'+Date.now().toString(36),n:0,inici:t,final:t+8,costat_servei:null,confianca_servei:1,guanya:null,descartada:false,revisada:true,afegida:true,ajust_inici:true});
+    save();renderView();toast('Jugada afegida a '+fmt(t)+'. Indica des de quin camp es serveix i marca el final.')};
   const acc=$('#revAcc');if(acc)acc.onclick=()=>{const R=revRows();let n=0;S.auto.jugades.forEach(j=>{const r=R.get(j.id);if(!j.descartada&&!j.guanya&&r&&r.prop){j.guanya=r.prop;j.revisada=true;n++}});save();renderView();toast(n+' propostes acceptades')};
   const ap=$('#revApply');if(ap)ap.onclick=()=>{const R=revRows();
     const pts=S.auto.jugades.filter(j=>!j.descartada).sort((a,b)=>a.inici-b.inici).map(j=>({j,w:j.guanya||(R.get(j.id)||{}).prop})).filter(x=>x.w);
@@ -964,9 +978,13 @@ function bindRev(){
     S.ev=S.ev.map((e,i)=>[e,i]).sort((a,b)=>(a[0].t||0)-(b[0].t||0)||a[1]-b[1]).map(x=>x[0]);
     S.auto.aplicada=Date.now();S.meta.exemple=false;save();render();toast(`${pts.length} punts aplicats al partit`)};
   $('#revLab').onclick=()=>{const R=revRows();
-    const lab={app:'sports-vidia-etiquetes',versio:1,video:S.auto.video,creat:new Date().toISOString(),
+    const falta=S.auto.jugades.filter(j=>!j.descartada&&!j.costat_servei).length;if(falta)return toast(`Falta el costat de servei a ${falta} jugada${falta>1?'es':''}`);
+    const lab={app:'sports-vidia-etiquetes',versio:2,video:S.auto.video,creat:new Date().toISOString(),
       jugades:S.auto.jugades.slice().sort((a,b)=>a.inici-b.inici).map(j=>{const r=R.get(j.id);const w=j.guanya||null;
-        return {inici:j.inici,final:j.final,costat_servei:j.costat_servei,descartada:!!j.descartada,afegida:!!j.afegida,revisada:!!j.revisada,
+        return {inici:j.inici,final:j.final,inici_proposat:j.inici0??null,final_proposat:j.final0??null,
+          ajust_inici:!!j.ajust_inici,ajust_final:!!j.ajust_final,
+          costat_servei:j.costat_servei||null,costat_proposat:j.costat0??null,costat_corregit:!!j.costat_corregit,
+          descartada:!!j.descartada,afegida:!!j.afegida,revisada:!!j.revisada,
           guanya_equip:w,guanya_costat:w&&r?(w===r.nearAfter?'proper':'llunya'):null}})};
     offerFile(((S.auto.video&&S.auto.video.nom)||'video')+'.etiquetes.json',JSON.stringify(lab,null,1))};
   const dr=$('#revDrop');if(dr)dr.onclick=()=>{if(dr.dataset.sure!=='1'){dr.dataset.sure='1';dr.textContent='Confirma: treu l\'anàlisi';return}

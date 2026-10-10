@@ -1,6 +1,6 @@
 # Anàlisi automàtica del vídeo — pla
 
-Estat: **fase 1 en funcionament (v0.1)**. Provada amb dos clips de 5 minuts (Curt-hospi_1 i _2).
+Estat: **fase 1 en funcionament (analitzador 0.2)**. Provada amb dos clips de 5 minuts (Curt-hospi_1 i _2).
 
 ## Decisions preses
 - Vídeos: propis i d'altres. L'anàlisi automàtica es fa amb **vídeos propis** (fitxer MP4 original o descarregat des de YouTube Studio). Els vídeos d'altres canals es continuen analitzant amb el registre manual, tret que en tinguem el fitxer amb permís.
@@ -46,6 +46,11 @@ Estat: **fase 1 en funcionament (v0.1)**. Provada amb dos clips de 5 minuts (Cur
 
 ## PC de l'usuari
 - NVIDIA GeForce RTX 3070 Laptop, Python 3.13.7.
+
+## Què s'aprèn a la fase 1
+- Tres llindars de detecció (xiulet, servidor proper, pujada de moviment), amb totes les jugades revisades.
+- Correccions de temps (inici per costat de servei, final per mètode: xiulet o moviment) i el nivell de moviment de "joc aturat", amb les jugades on s'han ajustat inici o final a l'app.
+- Es mesura també l'encert del costat de servei i l'error mitjà (mediana) d'inici i final en segons.
 
 ## Quan es canvia de fase
 Les decisions es prenen amb dades, no a ull: cada partit revisat a l'app es passa per `avalua`, que l'afegeix al conjunt d'aprenentatge, ajusta els paràmetres amb tots els partits i apunta el resultat a l'historial. `estat` mostra els criteris marcats o pendents. Un partit compta com a sencer si dura almenys 40 minuts.

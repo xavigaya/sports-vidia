@@ -32,6 +32,14 @@ Què fa:
 3. Desa els paràmetres millors a `parametres.json`. Les anàlisis següents ja els fan servir.
 4. Apunta el resultat a l'**historial** i mostra l'estat dels criteris per passar a la fase 2.
 
+**Què aprèn de cada revisió**
+- **Quines jugades hi ha**: les que descartes compten com a falses i les que afegeixes, com a no trobades. Amb això ajusta tres llindars (xiulet, servidor darrere la línia propera i pujada de moviment).
+- **Qui guanya cada punt**, per mesurar l'encert.
+- **Des de quin camp es serveix**: si el corregeixes, compta com a error del detector de servei.
+- **L'inici i el final de cada jugada**, si els ajustes amb els botons ⇤ ara i ara ⇥. L'analitzador aprèn quant s'avança o s'endarrereix habitualment, per separat segons si el servei és del camp proper o llunyà i segons si el final l'ha trobat pel xiulet o pel moviment, i aplica la correcció a les anàlisis següents. També tria quin nivell de moviment indica que el joc s'ha aturat.
+
+Per aprendre els temps calen almenys 3 jugades ajustades de cada tipus. No cal ajustar-les totes: amb unes quantes per partit n'hi ha prou.
+
 Si tornes a revisar un partit que ja és al conjunt, torna a executar `avalua` amb les etiquetes noves: s'actualitza.
 
 Altres ordres:

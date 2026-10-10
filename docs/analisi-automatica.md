@@ -48,7 +48,7 @@ Estat: **fase 1 en funcionament (v0.1)**. Provada amb dos clips de 5 minuts (Cur
 - NVIDIA GeForce RTX 3070 Laptop, Python 3.13.7.
 
 ## Quan es canvia de fase
-Les decisions es prenen amb dades, no a ull: cada partit revisat a l'app es passa per `avalua`, que dona les xifres.
+Les decisions es prenen amb dades, no a ull: cada partit revisat a l'app es passa per `avalua`, que l'afegeix al conjunt d'aprenentatge, ajusta els paràmetres amb tots els partits i apunta el resultat a l'historial. `estat` mostra els criteris marcats o pendents. Un partit compta com a sencer si dura almenys 40 minuts.
 
 **Fase 1 → fase 2 (detector de pilota)**, quan es compleixin les tres condicions:
 - Almenys **3 partits sencers** revisats i avaluats.

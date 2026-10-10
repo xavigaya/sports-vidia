@@ -22,11 +22,24 @@ Programa per al PC que llegeix el vídeo d'un partit (càmera fixa darrere el fo
    El botó ▶ de cada jugada la reprodueix i s'atura quan acaba. Mentre el vídeo avança, la jugada que es veu queda marcada a la llista.
 
 ## Aprenentatge
-Després de revisar un vídeo, a l'app prem **Desa les correccions per a l'aprenentatge**. Es descarrega `partit.mp4.etiquetes.json`. Llavors:
+Després de revisar un vídeo a l'app, prem **Desa les correccions per a l'aprenentatge**. Es descarrega `partit.mp4.etiquetes.json`. Llavors:
 
-`py vidia_analitza.py avalua "C:\Videos\partit.mp4" "partit.mp4.etiquetes.json"`
+`py vidia_analitza.py avalua "C:\Videos\partit.mp4" "C:\Users\xavi\Downloads\partit.mp4.etiquetes.json"`
 
-El programa mesura l'encert, prova altres ajustos i, si en troba de millors, els desa a `parametres.json`. Les anàlisis següents ja els faran servir. Com més vídeos revisats, millor s'ajusta.
+Què fa:
+1. Afegeix el partit al **conjunt d'aprenentatge** (carpeta `aprenentatge/`). Hi guarda les correccions, el calibratge i els senyals del vídeo, de manera que no cal tornar a llegir el vídeo.
+2. Ajusta els paràmetres amb **tots els partits del conjunt alhora**, no només amb l'últim.
+3. Desa els paràmetres millors a `parametres.json`. Les anàlisis següents ja els fan servir.
+4. Apunta el resultat a l'**historial** i mostra l'estat dels criteris per passar a la fase 2.
+
+Si tornes a revisar un partit que ja és al conjunt, torna a executar `avalua` amb les etiquetes noves: s'actualitza.
+
+Altres ordres:
+- `py vidia_analitza.py estat`: partits del conjunt, historial i criteris de canvi de fase.
+- `py vidia_analitza.py apren`: torna a ajustar els paràmetres amb tot el conjunt.
+- `py vidia_analitza.py oblida partit.mp4`: treu un partit del conjunt (per exemple, si les correccions estaven malament).
+
+La carpeta `aprenentatge/` i el fitxer `parametres.json` només són al teu PC (no es pugen a GitHub). Fes-ne una còpia de tant en tant.
 
 ## Com decideix
 - **Servei del camp proper**: algú es queda quiet darrere la línia de fons propera. És el senyal més fiable.

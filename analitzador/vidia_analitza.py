@@ -11,7 +11,11 @@ El guanyador de cada punt es dedueix del costat que serveix la jugada següent.
 Ús:
   python vidia_analitza.py calibra  VIDEO              -> crea VIDEO.calibratge.json
   python vidia_analitza.py analitza VIDEO              -> crea VIDEO.analisi.json (per importar a l'app)
-  python vidia_analitza.py avalua   VIDEO ETIQUETES    -> compara amb les correccions i ajusta paràmetres
+  python vidia_analitza.py avalua   VIDEO ETIQUETES    -> afegeix el partit revisat al conjunt d'aprenentatge
+                                                         i ajusta els paràmetres amb tots els partits
+  python vidia_analitza.py estat                       -> conjunt, historial i criteris de canvi de fase
+  python vidia_analitza.py apren                       -> torna a ajustar amb tot el conjunt
+  python vidia_analitza.py oblida NOM_VIDEO            -> treu un partit del conjunt
 
 Requisits: Python 3.10+, numpy, scipy, opencv-python, imageio-ffmpeg (veure requirements.txt).
 """
@@ -20,7 +24,7 @@ from pathlib import Path
 
 import numpy as np
 
-VERSIO = "0.1.0"
+VERSIO = "0.2.0"
 AQUI = Path(__file__).resolve().parent
 PARAMS_FILE = AQUI / "parametres.json"
 
@@ -478,58 +482,246 @@ def analitza(video, params=None, cal=None, quiet=False, cache=None):
 
 
 # ---------------------------------------------------------------- avaluació i aprenentatge
-def avalua(video, etiquetes_path):
-    """Compara la detecció amb les correccions fetes a l'app i busca millors paràmetres."""
-    et = json.loads(Path(etiquetes_path).read_text(encoding="utf-8"))
-    veritat = [j for j in et.get("jugades", []) if not j.get("descartada")]
-    if not veritat:
-        sys.exit("Les etiquetes no tenen cap jugada confirmada.")
+# Conjunt d'aprenentatge: cada partit revisat hi deixa les seves etiquetes i els senyals ja
+# calculats (so i imatge). Així els paràmetres s'ajusten amb tots els partits alhora i no cal
+# tornar a llegir els vídeos.
+APR = AQUI / "aprenentatge"
+INDEX = APR / "index.json"
+HIST = APR / "historial.json"
+TUNED = ("xiulet_llindar", "servei_llindar", "moviment_ratio")
+GRID = {"xiulet_llindar": (0.6, 0.8, 1.0, 1.2, 1.5),
+        "servei_llindar": (0.012, 0.016, 0.020, 0.026, 0.034),
+        "moviment_ratio": (1.15, 1.25, 1.4, 1.6)}
+CRITERIS = {"partits_sencers": 3, "trobades": 0.95, "falses": 0.05, "guanyador": 0.90,
+            "sense_canvis": 2, "durada_partit_sencer_s": 40 * 60}
+
+
+def _jread(path, default):
+    try:
+        return json.loads(Path(path).read_text(encoding="utf-8"))
+    except Exception:
+        return default
+
+
+def _jwrite(path, data):
+    Path(path).write_text(json.dumps(data, indent=1, ensure_ascii=False), encoding="utf-8")
+
+
+def _slug(nom):
+    return "".join(c if c.isalnum() or c in "-_." else "_" for c in nom)
+
+
+def calcula_senyals(video, cal, params):
+    info = video_info(video)
+    print("  · so (xiulets)…", flush=True)
+    score, hop, f0 = senyal_xiulet(video, params)
+    print("  · imatge (moviment i servidors)…", flush=True)
+    mov, near, far, fps = senyals_video(video, cal, params)
+    return {"score": score, "hop": hop, "f0": f0 or 0.0, "mov": mov, "near": near, "far": far,
+            "fps": fps, "durada": info["durada"]}
+
+
+def detecta_de_senyals(sig, params):
+    xiulets = troba_xiulets(sig["score"], float(sig["hop"]), params)
+    return detecta(xiulets, sig["mov"], sig["near"], sig["far"], int(sig["fps"]), params, float(sig["durada"]))
+
+
+def compara(det, etiquetes):
+    """Compara jugades detectades amb les revisades. Retorna comptadors."""
+    veritat = sorted([j for j in etiquetes if not j.get("descartada")], key=lambda j: j["inici"])
+    usades, trobades, enc_g, amb_g = set(), 0, 0, 0
+    for v in veritat:
+        best, bd = None, 4.0
+        for k, d in enumerate(det):
+            if k in usades:
+                continue
+            dd = abs(d["inici"] - v["inici"])
+            if dd <= bd:
+                best, bd = k, dd
+        if v.get("guanya_costat"):
+            amb_g += 1
+        if best is not None:
+            usades.add(best); trobades += 1
+            if v.get("guanya_costat") and det[best].get("guanya_costat") == v["guanya_costat"]:
+                enc_g += 1
+    return {"reals": len(veritat), "detectades": len(det), "trobades": trobades,
+            "falses": len(det) - len(usades), "amb_guanyador": amb_g, "guanyador_ok": enc_g}
+
+
+def _suma(rs):
+    t = {k: sum(r[k] for r in rs) for k in ("reals", "detectades", "trobades", "falses", "amb_guanyador", "guanyador_ok")}
+    t["pct_trobades"] = t["trobades"] / t["reals"] if t["reals"] else 0
+    t["pct_falses"] = t["falses"] / t["detectades"] if t["detectades"] else 0
+    t["pct_guanyador"] = t["guanyador_ok"] / t["amb_guanyador"] if t["amb_guanyador"] else 0
+    t["puntuacio"] = (2 * t["trobades"] / (t["reals"] + t["detectades"]) if t["reals"] + t["detectades"] else 0) + t["pct_guanyador"]
+    return t
+
+
+def carrega_conjunt():
+    idx = _jread(INDEX, [])
+    out = []
+    for e in idx:
+        f = APR / e["senyals"]
+        if not f.exists():
+            print(f"  Avís: falten els senyals de {e['nom']}; torna a executar avalua amb el vídeo.")
+            continue
+        z = np.load(f)
+        sig = {k: z[k] for k in z.files}
+        et = _jread(APR / e["etiquetes"], {}).get("jugades", [])
+        out.append((e, sig, et))
+    return out
+
+
+def avalua_conjunt(conjunt, params):
+    per = []
+    for e, sig, et in conjunt:
+        per.append(dict(compara(detecta_de_senyals(sig, params), et), nom=e["nom"]))
+    return per, _suma(per)
+
+
+def apren(motiu="aprenentatge", verbose=True):
+    conjunt = carrega_conjunt()
+    if not conjunt:
+        sys.exit("El conjunt d'aprenentatge és buit. Afegeix-hi un partit amb:  avalua VIDEO ETIQUETES")
     base = load_params()
-    cache = {}
+    per0, tot0 = avalua_conjunt(conjunt, base)
+    millor, mp = tot0, dict(base)
+    import itertools
+    combos = list(itertools.product(*GRID.values()))
+    print(f"Ajustant paràmetres amb {len(conjunt)} partit(s) ({len(combos)} combinacions)…", flush=True)
+    for vals in combos:
+        p = dict(base, **dict(zip(GRID.keys(), vals)))
+        _, t = avalua_conjunt(conjunt, p)
+        if t["puntuacio"] > millor["puntuacio"] + 1e-6:
+            millor, mp = t, p
+    canvi = any(abs(mp[k] - base[k]) > 1e-9 for k in TUNED)
+    if canvi:
+        cur = _jread(PARAMS_FILE, {})
+        cur.update({k: mp[k] for k in TUNED})
+        _jwrite(PARAMS_FILE, cur)
+    per1, tot1 = avalua_conjunt(conjunt, mp)
+    hist = _jread(HIST, [])
+    hist.append({"data": time.strftime("%Y-%m-%d %H:%M"), "motiu": motiu, "partits": len(conjunt),
+                 "partits_sencers": sum(1 for e, s, _ in conjunt if float(s["durada"]) >= CRITERIS["durada_partit_sencer_s"]),
+                 "abans": {k: round(tot0[k], 4) for k in ("pct_trobades", "pct_falses", "pct_guanyador")},
+                 "despres": {k: round(tot1[k], 4) for k in ("pct_trobades", "pct_falses", "pct_guanyador")},
+                 "parametres": {k: mp[k] for k in TUNED}, "canvi_parametres": canvi,
+                 "per_partit": [{k: r[k] for k in ("nom", "reals", "trobades", "falses", "amb_guanyador", "guanyador_ok")} for r in per1]})
+    _jwrite(HIST, hist)
+    if verbose:
+        print()
+        print(f"{'Partit':<38}{'Jugades':>9}{'Trobades':>10}{'Falses':>8}{'Guanyador':>11}")
+        for r in per1:
+            g = f"{r['guanyador_ok']}/{r['amb_guanyador']}" if r["amb_guanyador"] else "–"
+            print(f"{r['nom'][:37]:<38}{r['reals']:>9}{r['trobades']:>10}{r['falses']:>8}{g:>11}")
+        print(f"\nTotal amb els paràmetres {'nous' if canvi else 'actuals'}: "
+              f"{tot1['pct_trobades']:.0%} trobades · {tot1['pct_falses']:.0%} falses · {tot1['pct_guanyador']:.0%} guanyador encertat")
+        if canvi:
+            print(f"Abans: {tot0['pct_trobades']:.0%} trobades · {tot0['pct_falses']:.0%} falses · {tot0['pct_guanyador']:.0%} guanyador encertat")
+            print(f"Paràmetres nous desats a {PARAMS_FILE.name}: {({k: mp[k] for k in TUNED})}")
+        else:
+            print("Els paràmetres actuals ja són els millors per al conjunt.")
+        estat_fase()
+    return tot1
 
-    def puntua(params):
-        r = analitza(video, params, quiet=True, cache=cache)
-        det = r["jugades"]
-        enc_j = enc_g = 0
-        usades = set()
-        for v in veritat:
-            best = None
-            for k, d in enumerate(det):
-                if k in usades: continue
-                if abs(d["inici"] - v["inici"]) <= 4.0:
-                    best = k; break
-            if best is not None:
-                usades.add(best); enc_j += 1
-                if v.get("guanya_costat") and det[best].get("guanya_costat") == v["guanya_costat"]:
-                    enc_g += 1
-        falsos = len(det) - len(usades)
-        n = len(veritat)
-        f1 = 2 * enc_j / (n + len(det)) if det else 0
-        return {"jugades_trobades": enc_j, "jugades_reals": n, "falsos": falsos,
-                "guanyador_encertat": enc_g, "f1": round(f1, 3),
-                "puntuacio": f1 + enc_g / n}
 
-    print("Analitzant amb els paràmetres actuals…")
-    actual = puntua(base)
-    print(f"  Actual: {actual['jugades_trobades']}/{actual['jugades_reals']} jugades, "
-          f"{actual['falsos']} falses, guanyador encertat {actual['guanyador_encertat']}/{actual['jugades_reals']}")
-    millor, mp = actual, dict(base)
-    for k in (0.6, 0.8, 1.0, 1.2, 1.5):
-        for sl in (0.012, 0.016, 0.020, 0.026, 0.034):
-            for mr in (1.15, 1.25, 1.4):
-                p = dict(base, xiulet_llindar=k, servei_llindar=sl, moviment_ratio=mr)
-                r = puntua(p)
-                if r["puntuacio"] > millor["puntuacio"] + 1e-6:
-                    millor, mp = r, p
-    print(f"  Millor: {millor['jugades_trobades']}/{millor['jugades_reals']} jugades, "
-          f"{millor['falsos']} falses, guanyador encertat {millor['guanyador_encertat']}/{millor['jugades_reals']}")
-    if millor is not actual:
-        keep = {k: mp[k] for k in ("xiulet_llindar", "servei_llindar", "moviment_ratio")}
-        PARAMS_FILE.write_text(json.dumps(dict(load_params(), **keep), indent=2), encoding="utf-8")
-        print(f"  Paràmetres nous desats a {PARAMS_FILE.name}: {keep}")
-    else:
-        print("  Els paràmetres actuals ja són els millors per a aquestes etiquetes.")
-    return actual, millor
+def estat_fase():
+    hist = _jread(HIST, [])
+    if not hist:
+        print("Encara no hi ha cap avaluació.")
+        return False
+    h = hist[-1]; d = h["despres"]; C = CRITERIS
+    estables = 0
+    for x in reversed(hist):
+        if x.get("motiu") != "partit nou":
+            continue
+        if x["canvi_parametres"]:
+            break
+        estables += 1
+    checks = [
+        (f"Partits sencers revisats: {h['partits_sencers']} de {C['partits_sencers']}", h["partits_sencers"] >= C["partits_sencers"]),
+        (f"Jugades trobades: {d['pct_trobades']:.0%} (cal ≥ {C['trobades']:.0%})", d["pct_trobades"] >= C["trobades"]),
+        (f"Jugades falses: {d['pct_falses']:.0%} (cal ≤ {C['falses']:.0%})", d["pct_falses"] <= C["falses"]),
+        (f"Guanyador encertat: {d['pct_guanyador']:.0%} (cal ≥ {C['guanyador']:.0%})", d["pct_guanyador"] >= C["guanyador"]),
+        (f"Partits nous seguits sense canviar paràmetres: {estables} de {C['sense_canvis']}", estables >= C["sense_canvis"]),
+    ]
+    print("\nCriteris per passar a la fase 2:")
+    for t, ok in checks:
+        print(f"  [{'x' if ok else ' '}] {t}")
+    llest = all(ok for _, ok in checks)
+    print("  → La fase 1 ha arribat al seu límit: es pot passar a la fase 2." if llest
+          else "  → Encara a la fase 1.")
+    return llest
+
+
+def avalua(video, etiquetes_path, refresca=False):
+    """Afegeix (o actualitza) un partit revisat al conjunt i torna a ajustar els paràmetres amb tots."""
+    video = Path(video)
+    et = _jread(etiquetes_path, None)
+    if not et or et.get("app") != "sports-vidia-etiquetes":
+        sys.exit("Aquest fitxer no és d'etiquetes de Sports VidIA (es descarrega des de Revisió auto).")
+    if not [j for j in et.get("jugades", []) if not j.get("descartada")]:
+        sys.exit("Les etiquetes no tenen cap jugada confirmada.")
+    cp = Path(str(video) + ".calibratge.json")
+    if not cp.exists():
+        sys.exit(f"Falta el calibratge de {video.name}.")
+    APR.mkdir(exist_ok=True)
+    nom = video.name; sl = _slug(nom)
+    idx = _jread(INDEX, [])
+    e = next((x for x in idx if x["nom"] == nom), None)
+    npz = APR / f"{sl}.senyals.npz"
+    nou = e is None
+    if nou or refresca or not npz.exists():
+        print(f"Calculant els senyals de {nom} (només cal fer-ho un cop)…", flush=True)
+        sig = calcula_senyals(video, _jread(cp, {}), load_params())
+        np.savez_compressed(npz, **{k: np.asarray(v) for k, v in sig.items()})
+    shutil.copy(etiquetes_path, APR / f"{sl}.etiquetes.json")
+    shutil.copy(cp, APR / f"{sl}.calibratge.json")
+    rec = {"nom": nom, "video": str(video.resolve()), "senyals": npz.name,
+           "etiquetes": f"{sl}.etiquetes.json", "durada": round(video_info(video)["durada"], 1),
+           "jugades_revisades": len([j for j in et["jugades"] if not j.get("descartada")]),
+           "afegit": e["afegit"] if e else time.strftime("%Y-%m-%d %H:%M"),
+           "actualitzat": time.strftime("%Y-%m-%d %H:%M")}
+    idx = [x for x in idx if x["nom"] != nom] + [rec]
+    _jwrite(INDEX, idx)
+    print(f"{'Afegit' if nou else 'Actualitzat'} al conjunt d'aprenentatge: {nom} ({rec['jugades_revisades']} jugades revisades).")
+    return apren("partit nou" if nou else "correccions actualitzades")
+
+
+def mostra_estat():
+    idx = _jread(INDEX, [])
+    if not idx:
+        print("El conjunt d'aprenentatge és buit.")
+        return
+    print(f"Conjunt d'aprenentatge ({APR}):")
+    for e in idx:
+        sencer = "sencer" if e["durada"] >= CRITERIS["durada_partit_sencer_s"] else "fragment"
+        print(f"  · {e['nom']}  {e['durada'] / 60:.0f} min ({sencer}) · {e['jugades_revisades']} jugades · actualitzat {e['actualitzat']}")
+    hist = _jread(HIST, [])
+    if hist:
+        print("\nHistorial:")
+        for h in hist[-10:]:
+            d = h["despres"]
+            print(f"  {h['data']}  {h['motiu']:<26} {h['partits']} partits  "
+                  f"{d['pct_trobades']:.0%} trobades · {d['pct_falses']:.0%} falses · {d['pct_guanyador']:.0%} guanyador"
+                  f"{'  · paràmetres canviats' if h['canvi_parametres'] else ''}")
+    estat_fase()
+
+
+def oblida(nom):
+    idx = _jread(INDEX, [])
+    e = next((x for x in idx if x["nom"] == nom), None)
+    if not e:
+        sys.exit(f"No hi ha cap partit anomenat {nom} al conjunt. Mira'ls amb:  estat")
+    for f in (e["senyals"], e["etiquetes"], e["etiquetes"].replace(".etiquetes.json", ".calibratge.json")):
+        try:
+            (APR / f).unlink()
+        except FileNotFoundError:
+            pass
+    _jwrite(INDEX, [x for x in idx if x["nom"] != nom])
+    print(f"{nom} tret del conjunt.")
+    if len(idx) > 1:
+        apren("partit tret")
 
 
 def main():
@@ -539,8 +731,13 @@ def main():
     c.add_argument("video"); c.add_argument("--temps", type=float, default=None, help="segon del vídeo a mostrar")
     a = sub.add_parser("analitza", help="detecta les jugades i crea el fitxer per a l'app")
     a.add_argument("video"); a.add_argument("--sortida", default=None)
-    e = sub.add_parser("avalua", help="compara amb les correccions de l'app i ajusta paràmetres")
+    e = sub.add_parser("avalua", help="afegeix un partit revisat al conjunt i ajusta els paràmetres amb tots")
     e.add_argument("video"); e.add_argument("etiquetes")
+    e.add_argument("--refresca", action="store_true", help="torna a calcular els senyals del vídeo")
+    sub.add_parser("apren", help="torna a ajustar els paràmetres amb tot el conjunt")
+    sub.add_parser("estat", help="mostra el conjunt, l'historial i els criteris de canvi de fase")
+    o = sub.add_parser("oblida", help="treu un partit del conjunt d'aprenentatge")
+    o.add_argument("nom", help="nom del fitxer de vídeo, tal com surt a estat")
     args = ap.parse_args()
     if args.ordre == "calibra":
         calibra(args.video, args.temps)
@@ -548,10 +745,15 @@ def main():
         r = analitza(args.video)
         out = Path(args.sortida or (str(args.video) + ".analisi.json"))
         out.write_text(json.dumps(r, indent=1, ensure_ascii=False), encoding="utf-8")
-        n = len(r["jugades"])
-        print(f"Fet: {n} jugades detectades. Importa {out.name} a l'app (Partit → Importa anàlisi).")
+        print(f"Fet: {len(r['jugades'])} jugades detectades. Importa {out.name} a l'app (Revisió auto → Importa l'anàlisi).")
     elif args.ordre == "avalua":
-        avalua(args.video, args.etiquetes)
+        avalua(args.video, args.etiquetes, args.refresca)
+    elif args.ordre == "apren":
+        apren("ajust manual")
+    elif args.ordre == "estat":
+        mostra_estat()
+    elif args.ordre == "oblida":
+        oblida(args.nom)
 
 
 if __name__ == "__main__":

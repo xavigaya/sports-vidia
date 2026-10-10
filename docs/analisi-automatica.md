@@ -46,3 +46,19 @@ Estat: **fase 1 en funcionament (v0.1)**. Provada amb dos clips de 5 minuts (Cur
 
 ## PC de l'usuari
 - NVIDIA GeForce RTX 3070 Laptop, Python 3.13.7.
+
+## Quan es canvia de fase
+Les decisions es prenen amb dades, no a ull: cada partit revisat a l'app es passa per `avalua`, que dona les xifres.
+
+**Fase 1 → fase 2 (detector de pilota)**, quan es compleixin les tres condicions:
+- Almenys **3 partits sencers** revisats i avaluats.
+- Amb els millors paràmetres: **≥ 95 %** de jugades trobades, **≤ 5 %** de jugades falses i **≥ 90 %** de guanyadors encertats.
+- `avalua` ja no millora amb partits nous (dos partits seguits sense canvis de paràmetres), i els errors que queden són dels que resol la pilota: final de jugada imprecís i serveis del camp llunyà.
+Si no s'arriba a les xifres per problemes de calibratge, so o càmera, primer s'arreglen aquests i es queda a la fase 1.
+
+**Fase 2 → fase 3 (tipus d'acció)**:
+- Detector de pilota amb **≥ 85 %** d'encert en fotogrames d'un partit que no ha vist mai.
+- Uns **10 partits** amb registre manual d'accions lligat al vídeo (3.000-5.000 accions), que fan d'etiquetes.
+
+**Fase 3 → jugador i valoració**:
+- Tipus d'acció encertat **≥ 85 %** en partits nous.
